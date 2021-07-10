@@ -1,0 +1,7 @@
+cradle:
+  cabal:
+    - path: "app/Main.hs"
+      component: "panepon:exe:panepon"
+
+    - path: "./"
+      component: "lib:panepon"
