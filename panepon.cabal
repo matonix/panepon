@@ -33,6 +33,7 @@ library
   import:          shared-properties
   exposed-modules:
     Panepon.Board
+    Panepon.Cursor
     Panepon.Env
     Panepon.Game
     Panepon.Grid

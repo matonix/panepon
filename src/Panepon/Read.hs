@@ -2,6 +2,7 @@ module Panepon.Read where
 
 import Data.Maybe
 import Panepon.Board
+import Panepon.Cursor
 import Panepon.Grid
 import Panepon.Panel
 
@@ -24,7 +25,7 @@ sample =
     "...R..",
     "......",
     ".GGR..",
-    "GCCRYY"
+    "CGCRYY"
   ]
 
 toPanels :: [String] -> [Panel]
@@ -36,7 +37,7 @@ toPanels ss =
             Nothing -> Nothing
           | (c, x) <- zip s [1 ..]
         ]
-      | (s, y) <- zip ss [1 ..]
+      | (s, y) <- zip (reverse ss) [1 ..] -- 下から読む
     ]
 
 toBoard :: [String] -> Board
@@ -44,4 +45,4 @@ toBoard ss =
   let x = length $ head ss
       y = length ss
       ps = toPanels ss
-   in Board ps (Grid x y)
+   in Board ps (Grid x y) (Cursor 3 3)

@@ -3,11 +3,13 @@
 module Panepon.Panel where
 
 data Color = Red | Green | Cyan | Purple | Yellow | Blue
-  deriving (Eq)
+  deriving (Eq, Show)
 
 data State = Init | Idle | Move Direction | Float | Fall | Vanish | Empty
+  deriving (Eq, Show)
 
 data Direction = L | R
+  deriving (Eq, Show)
 
 type Count = Int
 
@@ -19,18 +21,20 @@ data Panel = Panel
     count :: Count,
     pos :: Pos
   }
+  deriving (Eq, Show)
 
 -- イベントの発行は発行者の責任（チェックはPanel側では行わない）
 data Event
   = Tick
   | Lift
-  | CountFinish Count
+  | CountFinish State Count
   | Bottom State Count
   | Available
   | Combo
   | Swap Direction
 
 isGround :: State -> Bool
+isGround Init = True
 isGround Idle = True
 isGround (Move _) = True
 isGround Vanish = True
@@ -45,16 +49,16 @@ isMovable _ = False
 next :: Event -> Panel -> Panel
 next Tick panel@(count -> c) = panel {count = c + 1}
 next Lift panel@(pos -> (x, y)) = panel {pos = (x, y + 1)}
-next (CountFinish c) panel@(state -> Move d) | count panel == c = panel {state = Idle, count = 0}
-next (CountFinish c) panel@(state -> Float) | count panel == c = panel {state = Fall, count = 0}
-next (CountFinish c) panel@(state -> Vanish) | count panel == c = panel {state = Empty, count = 0}
+next (CountFinish (Move d) c) panel@(state -> Move d') | count panel == c && d == d' = panel {state = Idle, count = 0}
+next (CountFinish Float c) panel@(state -> Float) | count panel == c = panel {state = Fall, count = 0}
+next (CountFinish Fall c) panel@(state -> Fall) | count panel == c = let (x, y) = pos panel in panel {state = Fall, count = 0, pos = (x, y - 1)}
+next (CountFinish Vanish c) panel@(state -> Vanish) | count panel == c = panel {state = Empty, count = 0}
 next (Bottom Empty _) panel@(state -> Idle) = panel {state = Float, count = 0}
 next (Bottom Fall _) panel@(state -> Idle) = panel {state = Fall, count = 0}
 next (Bottom Float c) panel@(state -> Fall) = panel {state = Float, count = c}
 next (Bottom b _) panel@(state -> Fall) | isGround b = panel {state = Idle, count = 0}
 next Available panel@(state -> Init) = panel {state = Idle}
 next Combo panel@(state -> Idle) = panel {state = Vanish, count = 0}
-next (Swap d) panel@(state -> Idle) = panel {state = Move d, count = 0}
-next (Swap d) panel@(state -> Idle) = panel {state = Move d, count = 0}
-next (Swap d) panel@(state -> s) | isMovable s = panel {state = Move d, count = 0}
+next (Swap L) panel@(state -> s) | isMovable s = let (x, y) = pos panel in panel {state = Move L, count = 0, pos = (x - 1, y)}
+next (Swap R) panel@(state -> s) | isMovable s = let (x, y) = pos panel in panel {state = Move R, count = 0, pos = (x + 1, y)}
 next _ panel = panel
