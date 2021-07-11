@@ -1,6 +1,6 @@
 <mxfile>
     <diagram id="TaGhLxnzKJmuEsDH-7bl" name="Page-1">
-        <mxGraphModel dx="637" dy="488" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="397" dy="488" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -128,6 +128,21 @@
                     <mxGeometry width="50" height="50" relative="1" as="geometry">
                         <mxPoint x="40" y="101" as="sourcePoint"/>
                         <mxPoint x="510" y="141" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="97" value="Introduce Init" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="10">
+                    <mxGeometry x="-0.3099" y="-1" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="98" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;dashed=1;" edge="1" parent="1" source="12">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="780" y="440" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="99" value="Empty Collect" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="98">
+                    <mxGeometry x="-0.373" y="-3" relative="1" as="geometry">
+                        <mxPoint x="11" y="7" as="offset"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="12" value="Empty" style="ellipse;whiteSpace=wrap;html=1;" parent="1" vertex="1">

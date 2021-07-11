@@ -44,7 +44,7 @@ type Events = [Event]
 
 next :: Events -> Board -> Board
 next events (Board panels grid cursor) =
-  let cursor' = nextCursor events cursor
+  let cursor' = nextCursor events grid cursor
       panels' = nextPanels events grid cursor' panels
    in Board panels' grid cursor'
 
@@ -118,13 +118,14 @@ nextPanels events (Grid x y) (C.Cursor x' y') panels =
           else combo
    in swapped
 
-nextCursor :: Events -> C.Cursor -> C.Cursor
-nextCursor events cursor = foldr (C.next . toCursorEvent) cursor events
+nextCursor :: Events -> Grid -> C.Cursor -> C.Cursor
+nextCursor events grid cursor = foldr (C.next . toCursorEvent grid cursor) cursor events
 
-toCursorEvent :: Event -> C.Event
-toCursorEvent Up = C.Up
-toCursorEvent Down = C.Down
-toCursorEvent Left = C.Left
-toCursorEvent Right = C.Right
-toCursorEvent Swap = C.None
-toCursorEvent Lift = C.None
+toCursorEvent :: Grid -> C.Cursor -> Event -> C.Event
+toCursorEvent (Grid x y) (C.Cursor x' y') Up | y' < y = C.Up
+toCursorEvent (Grid x y) (C.Cursor x' y') Down | y' > 1 = C.Down
+toCursorEvent (Grid x y) (C.Cursor x' y') Left | x' > 1 = C.Left
+toCursorEvent (Grid x y) (C.Cursor x' y') Right | x' + 1 < x = C.Right
+toCursorEvent _ _ Swap = C.None
+toCursorEvent _ _ Lift = C.None
+toCursorEvent _ _ _ = C.None

@@ -40,7 +40,7 @@ instance Render Board String where
                   | i == x' + 2 && j == y' -> "]"
                   | otherwise -> " "
                 ++ maybe " " render (find ((== (i, j)) . pos) panels)
-              | i <- [1 .. x]
+              | i <- [1 .. x + 1]
             ]
           | j <- [1 .. y]
         ]

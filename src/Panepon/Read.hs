@@ -15,19 +15,6 @@ parse 'Y' = Just Yellow
 parse 'B' = Just Blue
 parse _ = Nothing
 
-sample :: [String]
-sample =
-  [ "......",
-    "......",
-    "......",
-    "...Y..",
-    "...C..",
-    "...R..",
-    "......",
-    ".GGR..",
-    "CGCRYY"
-  ]
-
 toPanels :: [String] -> [Panel]
 toPanels ss =
   concat
