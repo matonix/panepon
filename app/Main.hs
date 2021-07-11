@@ -8,7 +8,7 @@ import Prelude hiding (Left, Right)
 main :: IO ()
 main = do
   let board = toBoard sample
-  let events = [[Down], [Down, Left], [Left], [Swap]] ++ repeat []
+  let events = [[Down], [Down, Left], [Left], [Swap], [Left], [Left]] ++ repeat []
   loop 0 events board
   where
     loop 13 _ _ = return ()
