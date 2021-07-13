@@ -31,16 +31,16 @@ instance Render Panel String where
   render (color -> Blue) = "▽"
 
 instance Render Board String where
-  render (Board panels (Grid x y) (Cursor x' y')) =
+  render (Board panels (getBound -> (w, h)) (Cursor x y)) =
     unlines $
       reverse -- 上から下へ
         [ concat
             [ if
-                  | i == x' && j == y' -> "["
-                  | i == x' + 2 && j == y' -> "]"
+                  | i == x && j == y -> "["
+                  | i == x + 2 && j == y -> "]"
                   | otherwise -> " "
                 ++ maybe " " render (find ((== (i, j)) . pos) panels)
-              | i <- [1 .. x + 1]
+              | i <- [1 .. w + 1]
             ]
-          | j <- [1 .. y]
+          | j <- [1 .. h]
         ]

@@ -1,11 +1,12 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Panepon.Board where
 
 import Data.Foldable
 import Data.Maybe
 import qualified Panepon.Cursor as C
-import Panepon.Grid
+import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
 import Prelude hiding (Left, Right)
 
@@ -13,7 +14,7 @@ type Panels = [P.Panel]
 
 data Board = Board
   { panels :: Panels,
-    grid :: Grid,
+    grid :: G.Grid,
     cursor :: C.Cursor
   }
   deriving (Show)
@@ -31,6 +32,12 @@ fallFinish = 1
 vanishFinish :: Int
 vanishFinish = 1
 
+liftFinish :: Int
+liftFinish = 2
+
+forceLiftFinish :: Int
+forceLiftFinish = 1
+
 data Event
   = Up
   | Down
@@ -44,17 +51,47 @@ type Events = [Event]
 
 next :: Events -> Board -> Board
 next events (Board panels grid cursor) =
-  let cursor' = nextCursor events grid cursor
-      panels' = nextPanels events grid cursor' panels
-   in Board panels' grid cursor'
+  let grid' = nextGrid events grid
+      cursor' = nextCursor events grid' cursor
+      panels' = nextPanels events grid' cursor' panels
+   in Board panels' grid' cursor'
 
-nextPanels :: Events -> Grid -> C.Cursor -> Panels -> Panels
-nextPanels events (Grid x y) (C.Cursor x' y') panels =
+nextGrid :: Events -> G.Grid -> G.Grid
+nextGrid events grid =
+  if Lift `elem` events
+    then G.next (G.Force forceLiftFinish) grid
+    else G.next (G.Auto liftFinish) grid
+
+nextCursor :: Events -> G.Grid -> C.Cursor -> C.Cursor
+nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor events'
+  where
+    (w, h) = G.getBound grid
+    events' = if G.lift grid == 0 then events ++ [Up] else events
+    toCursorEvent :: C.Cursor -> Event -> C.Event
+    toCursorEvent (C.Cursor x y) Up | y < h = C.Up
+    toCursorEvent (C.Cursor x y) Down | y > 1 = C.Down
+    toCursorEvent (C.Cursor x y) Left | x > 1 = C.Left
+    toCursorEvent (C.Cursor x y) Right | x + 1 < w = C.Right
+    toCursorEvent _ _ = C.None
+
+nextPanels :: Events -> G.Grid -> C.Cursor -> Panels -> Panels
+nextPanels events grid (C.Cursor x' y') panels =
   let -- tick event
       ticked = map (P.next P.Tick) panels
       -- TODO lift
-      dummyGrounds = [P.Panel P.Red P.Init 0 (i, 0) | i <- [1 .. x]]
-      lifted = ticked ++ dummyGrounds
+      dummyGrounds =
+        [ P.Panel c P.Init 0 (i, - G.depth grid)
+          | i <- [1 .. G.width grid],
+            let c = if even i then P.Purple else P.Yellow
+        ]
+      lifted =
+        if G.lift grid == 0
+          then
+            let liftApplied = map (P.next P.Lift) ticked
+                available = flip map liftApplied $ \p ->
+                  let (_, j) = P.pos p in if j > 0 then P.next P.Available p else p
+             in available ++ dummyGrounds
+          else ticked
       -- count finish
       cf =
         flip map lifted $
@@ -117,15 +154,3 @@ nextPanels events (Grid x y) (C.Cursor x' y') panels =
                     | otherwise -> p
           else combo
    in swapped
-
-nextCursor :: Events -> Grid -> C.Cursor -> C.Cursor
-nextCursor events grid cursor = foldr (C.next . toCursorEvent grid cursor) cursor events
-
-toCursorEvent :: Grid -> C.Cursor -> Event -> C.Event
-toCursorEvent (Grid x y) (C.Cursor x' y') Up | y' < y = C.Up
-toCursorEvent (Grid x y) (C.Cursor x' y') Down | y' > 1 = C.Down
-toCursorEvent (Grid x y) (C.Cursor x' y') Left | x' > 1 = C.Left
-toCursorEvent (Grid x y) (C.Cursor x' y') Right | x' + 1 < x = C.Right
-toCursorEvent _ _ Swap = C.None
-toCursorEvent _ _ Lift = C.None
-toCursorEvent _ _ _ = C.None

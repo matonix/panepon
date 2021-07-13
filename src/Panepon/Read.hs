@@ -29,7 +29,8 @@ toPanels ss =
 
 toBoard :: [String] -> Board
 toBoard ss =
-  let x = length $ head ss
-      y = length ss
+  let w = length $ head ss
+      h = length ss
       ps = toPanels ss
-   in Board ps (Grid x y) (Cursor 3 3)
+      dummyGrounds = [Panel c Init 0 (i, 0) | i <- [1 .. w], let c = if even i then Purple else Yellow]
+   in Board (ps ++ dummyGrounds) (Grid w h 0 0) (Cursor 3 3)
