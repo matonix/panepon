@@ -7,8 +7,8 @@ import Prelude hiding (Left, Right)
 
 main :: IO ()
 main = do
-  let board = toBoard sample
-  loop 0 events board
+  let board = toBoard sample2
+  loop 0 events2 board
   where
     loop 13 _ _ = return ()
     loop t (e : es) board = do
@@ -30,5 +30,21 @@ sample =
     "CGCRYY"
   ]
 
+sample2 :: [String]
+sample2 =
+  [ "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ]
+
 events :: [Events]
 events = [[Down], [Down, Left], [Left], [Swap], [Right], [Right, Down], [Right, Up], [Right], [Right] ] ++ repeat []
+
+events2 :: [Events]
+events2 = repeat []

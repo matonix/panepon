@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -5,6 +6,7 @@ module Panepon.Board where
 
 import Data.Foldable
 import Data.Maybe
+import Data.List
 import qualified Panepon.Cursor as C
 import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
@@ -15,9 +17,12 @@ type Panels = [P.Panel]
 data Board = Board
   { panels :: Panels,
     grid :: G.Grid,
-    cursor :: C.Cursor
+    cursor :: C.Cursor,
+    gen :: DetGen
   }
   deriving (Show)
+
+-- rules
 
 moveFinish :: Int
 moveFinish = 1
@@ -38,6 +43,9 @@ liftFinish = 2
 forceLiftFinish :: Int
 forceLiftFinish = 1
 
+availableColors :: [P.Color]
+availableColors = [P.Red, P.Green, P.Cyan, P.Purple, P.Yellow, P.Blue]
+
 data Event
   = Up
   | Down
@@ -50,11 +58,11 @@ data Event
 type Events = [Event]
 
 next :: Events -> Board -> Board
-next events (Board panels grid cursor) =
+next events (Board panels grid cursor gen) =
   let grid' = nextGrid events grid
       cursor' = nextCursor events grid' cursor
-      panels' = nextPanels events grid' cursor' panels
-   in Board panels' grid' cursor'
+      (panels', gen') = nextPanels events grid' cursor' panels gen
+   in Board panels' grid' cursor' gen'
 
 nextGrid :: Events -> G.Grid -> G.Grid
 nextGrid events grid =
@@ -74,27 +82,66 @@ nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor eve
     toCursorEvent (C.Cursor x y) Right | x + 1 < w = C.Right
     toCursorEvent _ _ = C.None
 
-nextPanels :: Events -> G.Grid -> C.Cursor -> Panels -> Panels
-nextPanels events grid (C.Cursor x' y') panels =
+class ColorGenerator g where
+  getNext :: g -> (P.Color, g)
+  mkGen :: g
+
+-- deterministic
+newtype DetGen = DetGen [P.Color]
+instance ColorGenerator DetGen where
+  getNext (DetGen (c:cs)) = (c, DetGen cs)
+  mkGen = DetGen $ cycle $ concat $ permutations availableColors
+instance Show DetGen where
+  show = const "DetGen"
+
+genPanel :: ColorGenerator g => g -> Panels -> P.Pos -> (P.Panel, g)
+genPanel gen panels pos@(i, j) = (P.Panel c P.Init 0 pos, gen')
+  where
+    (c, gen') = go gen ngs
+      where
+        go gen ngs = let (c, gen') = getNext gen in if c `elem` ngs then go gen' ngs else (c, gen')
+    ngs = catMaybes [muc, mlc, mrc]
+      where
+        mu1 = find ((== (i, j + 1)) . P.pos) panels
+        mu2 = find ((== (i, j + 2)) . P.pos) panels
+        ml1 = find ((== (i - 1, j)) . P.pos) panels
+        ml2 = find ((== (i - 2, j)) . P.pos) panels
+        mr1 = find ((== (i + 1, j)) . P.pos) panels
+        mr2 = find ((== (i + 2, j)) . P.pos) panels
+        sameOrNothing (Just a) (Just b) | P.color a == P.color b = Just $ P.color a
+        sameOrNothing _ _ = Nothing
+        muc = sameOrNothing mu1 mu2
+        mlc = sameOrNothing ml1 ml2
+        mrc = sameOrNothing mr1 mr2
+
+genPanels :: ColorGenerator g => g -> Panels -> [P.Pos] -> (Panels, g)
+genPanels gen panels poss = go poss gen panels
+  where
+    go [] gen ps = (ps, gen)
+    go (pos:poss) gen ps = let (p, gen') = genPanel gen ps pos in go poss gen' (p:ps)
+
+-- >>> genGround (mkGen::DetGen) [] (G.Grid 2 9 0 0 False)
+-- ([Panel {color = Green, state = Init, count = 0, pos = (2,0)},Panel {color = Red, state = Init, count = 0, pos = (1,0)}],DetGen)
+genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
+genGround gen panels grid = genPanels gen panels [(i, - G.depth grid) | i <- [1 .. G.width grid]] 
+
+nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> (Panels, g)
+nextPanels events grid (C.Cursor x' y') panels gen =
   let -- tick event
       ticked = map (P.next P.Tick) panels
       -- TODO lift
-      dummyGrounds =
-        [ P.Panel c P.Init 0 (i, - G.depth grid)
-          | i <- [1 .. G.width grid],
-            let c = if even i then P.Purple else P.Yellow
-        ]
       lifted =
-        if G.lift grid == 0
+        if G.liftComplete grid
           then
             let liftApplied = map (P.next P.Lift) ticked
                 available = flip map liftApplied $ \p ->
                   let (_, j) = P.pos p in if j > 0 then P.next P.Available p else p
-             in available ++ dummyGrounds
+             in available
           else ticked
+      (groundAdded, gen') = genGround gen lifted grid
       -- count finish
       cf =
-        flip map lifted $
+        flip map groundAdded $
           P.next (P.CountFinish (P.Move P.L) moveFinish)
             . P.next (P.CountFinish (P.Move P.R) moveFinish)
             . P.next (P.CountFinish P.Float floatFinish)
@@ -153,4 +200,4 @@ nextPanels events grid (C.Cursor x' y') panels =
                     | i == x' + 1 && j == y' -> P.next (P.Swap P.L) p
                     | otherwise -> p
           else combo
-   in swapped
+   in (swapped, gen')

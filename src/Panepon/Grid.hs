@@ -11,7 +11,8 @@ data Grid = Grid
   { width :: Int,
     height :: Int,
     depth :: Int,
-    lift :: Rational
+    lift :: Rational,
+    liftComplete :: Bool
   }
   deriving (Show)
 
@@ -23,8 +24,8 @@ getBound :: Grid -> (Int, Int)
 getBound = width &&& height
 
 next :: Event -> Grid -> Grid
-next (Auto f) grid@(lift -> l) = grid {lift = zeroToOne $ l + 1 % fromIntegral f}
-next (Force f) grid@(lift -> l) = grid {lift = zeroToOne $ l + 1 % fromIntegral f}
+next (Auto f) grid@(lift -> l) = let nextLift = zeroToOne $ l + 1 % fromIntegral f in grid {lift = nextLift, liftComplete = nextLift == 0}
+next (Force f) grid@(lift -> l) = let nextLift = zeroToOne $ l + 1 % fromIntegral f in grid {lift = nextLift, liftComplete = nextLift == 0}
 
 -- >>> zeroToOne 1.2
 -- 1 % 5

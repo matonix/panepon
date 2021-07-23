@@ -31,6 +31,8 @@ toBoard :: [String] -> Board
 toBoard ss =
   let w = length $ head ss
       h = length ss
+      d = 2
       ps = toPanels ss
-      dummyGrounds = [Panel c Init 0 (i, 0) | i <- [1 .. w], let c = if even i then Purple else Yellow]
-   in Board (ps ++ dummyGrounds) (Grid w h 0 0) (Cursor 3 3)
+      gen = mkGen
+      (panels, gen') = genPanels gen ps [(i, j) | i <- [1 .. w], j <- [-d .. 0]]
+   in Board panels (Grid w h d 0 False) (Cursor 3 3) gen'

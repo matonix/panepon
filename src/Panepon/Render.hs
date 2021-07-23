@@ -31,7 +31,7 @@ instance Render Panel String where
   render (color -> Blue) = "▽"
 
 instance Render Board String where
-  render (Board panels (getBound -> (w, h)) (Cursor x y)) =
+  render (Board panels (getBound -> (w, h)) (Cursor x y) _) =
     unlines $
       reverse -- 上から下へ
         [ concat
