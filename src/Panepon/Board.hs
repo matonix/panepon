@@ -1,12 +1,12 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Panepon.Board where
 
 import Data.Foldable
-import Data.Maybe
 import Data.List
+import Data.Maybe
 import qualified Panepon.Cursor as C
 import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
@@ -41,7 +41,7 @@ liftFinish :: Int
 liftFinish = 2
 
 forceLiftFinish :: Int
-forceLiftFinish = 1
+forceLiftFinish = 3
 
 availableColors :: [P.Color]
 availableColors = [P.Red, P.Green, P.Cyan, P.Purple, P.Yellow, P.Blue]
@@ -59,16 +59,16 @@ type Events = [Event]
 
 next :: Events -> Board -> Board
 next events (Board panels grid cursor gen) =
-  let grid' = nextGrid events grid
+  let grid' = nextGrid events panels grid
       cursor' = nextCursor events grid' cursor
       (panels', gen') = nextPanels events grid' cursor' panels gen
    in Board panels' grid' cursor' gen'
 
-nextGrid :: Events -> G.Grid -> G.Grid
-nextGrid events grid =
-  if Lift `elem` events
-    then G.next (G.Force forceLiftFinish) grid
-    else G.next (G.Auto liftFinish) grid
+nextGrid :: Events -> Panels -> G.Grid -> G.Grid
+nextGrid events panels grid
+  | not $ all (\(P.state -> s) -> s == P.Init || s == P.Idle || s == P.Empty) panels = G.next G.Stop grid
+  | Lift `elem` events || (G.forceMode grid && not (G.liftComplete grid)) = G.next (G.Force forceLiftFinish) grid
+  | otherwise = G.next (G.Auto liftFinish) grid
 
 nextCursor :: Events -> G.Grid -> C.Cursor -> C.Cursor
 nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor events'
@@ -88,9 +88,11 @@ class ColorGenerator g where
 
 -- deterministic
 newtype DetGen = DetGen [P.Color]
+
 instance ColorGenerator DetGen where
-  getNext (DetGen (c:cs)) = (c, DetGen cs)
+  getNext (DetGen (c : cs)) = (c, DetGen cs)
   mkGen = DetGen $ cycle $ concat $ permutations availableColors
+
 instance Show DetGen where
   show = const "DetGen"
 
@@ -118,12 +120,12 @@ genPanels :: ColorGenerator g => g -> Panels -> [P.Pos] -> (Panels, g)
 genPanels gen panels poss = go poss gen panels
   where
     go [] gen ps = (ps, gen)
-    go (pos:poss) gen ps = let (p, gen') = genPanel gen ps pos in go poss gen' (p:ps)
+    go (pos : poss) gen ps = let (p, gen') = genPanel gen ps pos in go poss gen' (p : ps)
 
 -- >>> genGround (mkGen::DetGen) [] (G.Grid 2 9 0 0 False)
 -- ([Panel {color = Green, state = Init, count = 0, pos = (2,0)},Panel {color = Red, state = Init, count = 0, pos = (1,0)}],DetGen)
 genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
-genGround gen panels grid = genPanels gen panels [(i, - G.depth grid) | i <- [1 .. G.width grid]] 
+genGround gen panels grid = genPanels gen panels [(i, - G.depth grid) | i <- [1 .. G.width grid]]
 
 nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> (Panels, g)
 nextPanels events grid (C.Cursor x' y') panels gen =

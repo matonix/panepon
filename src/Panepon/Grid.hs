@@ -12,26 +12,32 @@ data Grid = Grid
     height :: Int,
     depth :: Int,
     lift :: Rational,
-    liftComplete :: Bool
+    liftComplete :: Bool,
+    forceMode :: Bool
   }
   deriving (Show)
 
 data Event
   = Auto Int -- frame / panel
   | Force Int -- frame / panel
+  | Stop
 
 getBound :: Grid -> (Int, Int)
 getBound = width &&& height
 
 next :: Event -> Grid -> Grid
-next (Auto f) grid@(lift -> l) = let nextLift = zeroToOne $ l + 1 % fromIntegral f in grid {lift = nextLift, liftComplete = nextLift == 0}
-next (Force f) grid@(lift -> l) = let nextLift = zeroToOne $ l + 1 % fromIntegral f in grid {lift = nextLift, liftComplete = nextLift == 0}
+next (Auto f) grid@(lift -> l) = let nextLift = tick l f in grid {lift = nextLift, liftComplete = nextLift == 0, forceMode = False}
+next (Force f) grid@(lift -> l) = let nextLift = tick l f in grid {lift = nextLift, liftComplete = nextLift == 0, forceMode = True}
+next Stop grid = grid
+
+tick :: Rational -> Int -> Rational
+tick l f = zeroToOne $ l + 1 % fromIntegral f
 
 -- >>> zeroToOne 1.2
--- 1 % 5
+-- 0 % 1
 -- >>> zeroToOne 0.25
 -- 1 % 4
 -- >>> zeroToOne 1 == 0
 -- True
 zeroToOne :: Rational -> Rational
-zeroToOne r = r - fromInteger (numerator r `div` denominator r)
+zeroToOne r = if r >= 1 then 0 else r
