@@ -19,7 +19,8 @@ data Panel = Panel
   { color :: Color,
     state :: State,
     count :: Count,
-    pos :: Pos
+    pos :: Pos,
+    chainable :: Bool
   }
   deriving (Eq, Show)
 
@@ -28,7 +29,7 @@ data Event
   = Tick
   | Lift
   | CountFinish State Count
-  | Bottom State Count
+  | Bottom State Count Bool
   | Available
   | Combo
   | Swap Direction
@@ -53,10 +54,11 @@ next (CountFinish (Move d) c) panel@(state -> Move d') | count panel == c && d =
 next (CountFinish Float c) panel@(state -> Float) | count panel == c = panel {state = Fall, count = 0}
 next (CountFinish Fall c) panel@(state -> Fall) | count panel == c = let (x, y) = pos panel in panel {state = Fall, count = 0, pos = (x, y - 1)}
 next (CountFinish Vanish c) panel@(state -> Vanish) | count panel == c = panel {state = Empty, count = 0}
-next (Bottom Empty _) panel@(state -> Idle) = panel {state = Float, count = 0}
-next (Bottom Fall _) panel@(state -> Idle) = panel {state = Fall, count = 0}
-next (Bottom Float c) panel@(state -> Fall) = panel {state = Float, count = c}
-next (Bottom b _) panel@(state -> Fall) | isGround b = panel {state = Idle, count = 0}
+next (Bottom Empty _ chainable) panel@(state -> Idle) = panel {state = Float, count = 0, chainable = chainable}
+next (Bottom Fall _ chainable) panel@(state -> Idle) = panel {state = Fall, count = 0, chainable = chainable}
+next (Bottom Float c _) panel@(state -> Fall) = panel {state = Float, count = c}
+next (Bottom b _ _) panel@(state -> Fall) | isGround b = panel {state = Idle, count = 0}
+next (Bottom b _ _) panel@(state -> Idle) | isGround b && count panel > 0 = panel {state = Idle, chainable = False}
 next Available panel@(state -> Init) = panel {state = Idle}
 next Combo panel@(state -> Idle) = panel {state = Vanish, count = 0}
 next (Swap L) panel@(state -> s) | isMovable s = let (x, y) = pos panel in panel {state = Move L, count = 0, pos = (x - 1, y)}

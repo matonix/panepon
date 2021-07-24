@@ -20,7 +20,7 @@ toPanels ss =
   concat
     [ catMaybes
         [ case parse c of
-            Just col -> Just $ Panel col Idle 0 (x, y)
+            Just col -> Just $ Panel col Idle 0 (x, y) False
             Nothing -> Nothing
           | (c, x) <- zip s [1 ..]
         ]
