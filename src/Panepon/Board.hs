@@ -18,7 +18,9 @@ data Board = Board
   { panels :: Panels,
     grid :: G.Grid,
     cursor :: C.Cursor,
-    gen :: DetGen
+    gen :: DetGen,
+    combo :: Int,
+    chain :: Int
   }
   deriving (Show)
 
@@ -58,11 +60,11 @@ data Event
 type Events = [Event]
 
 next :: Events -> Board -> Board
-next events (Board panels grid cursor gen) =
+next events (Board panels grid cursor gen combo chain) =
   let grid' = nextGrid events panels grid
       cursor' = nextCursor events grid' cursor
-      (panels', gen') = nextPanels events grid' cursor' panels gen
-   in Board panels' grid' cursor' gen'
+      (panels', gen', combo', chain') = nextPanels events grid' cursor' panels gen combo chain
+   in Board panels' grid' cursor' gen' combo' chain'
 
 nextGrid :: Events -> Panels -> G.Grid -> G.Grid
 nextGrid events panels grid
@@ -127,11 +129,11 @@ genPanels gen panels poss = go poss gen panels
 genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
 genGround gen panels grid = genPanels gen panels [(i, - G.depth grid) | i <- [1 .. G.width grid]]
 
-nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> (Panels, g)
-nextPanels events grid (C.Cursor x' y') panels gen =
+nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int)
+nextPanels events grid (C.Cursor x' y') panels gen combo chain =
   let -- tick event
       ticked = map (P.next P.Tick) panels
-      -- TODO lift
+      -- lift
       lifted =
         if G.liftComplete grid
           then
@@ -164,14 +166,12 @@ nextPanels events grid (C.Cursor x' y') panels gen =
                 c = maybe 0 P.count mp
              in P.next (P.Bottom s c) p
       bc = loop ec []
-      -- TODO availables
-      avail = bc
       -- TODO combo
       comboableH = concat $
-        flip map avail $ \p ->
+        flip map bc $ \p ->
           let (i, j) = P.pos p
-              ml = find ((== (i - 1, j)) . P.pos) avail
-              mr = find ((== (i + 1, j)) . P.pos) avail
+              ml = find ((== (i - 1, j)) . P.pos) bc
+              mr = find ((== (i + 1, j)) . P.pos) bc
            in case (ml, mr) of
                 (Just l, Just r)
                   | all ((P.Idle ==) . P.state) [p, l, r]
@@ -179,27 +179,30 @@ nextPanels events grid (C.Cursor x' y') panels gen =
                     map P.pos [p, l, r]
                 _ -> []
       comboableV = concat $
-        flip map avail $ \p ->
+        flip map bc $ \p ->
           let (i, j) = P.pos p
-              mu = find ((== (i, j + 1)) . P.pos) avail
-              md = find ((== (i, j - 1)) . P.pos) avail
+              mu = find ((== (i, j + 1)) . P.pos) bc
+              md = find ((== (i, j - 1)) . P.pos) bc
            in case (mu, md) of
                 (Just u, Just d)
                   | all ((P.Idle ==) . P.state) [p, u, d]
                       && all ((P.color p ==) . P.color) [u, d] ->
                     map P.pos [p, u, d]
                 _ -> []
-      combo = flip map avail $ \p ->
+      comboFired = flip map bc $ \p ->
         let pos = P.pos p
          in if elem pos comboableH || elem pos comboableV then P.next P.Combo p else p
-      -- TODO swap
+      combo' = length $ filter (\p -> P.state p == P.Vanish && P.count p == 0) comboFired
+      -- TODO chain
+      chain' = chain
+      -- swap
       swapped =
         if Swap `elem` events
-          then flip map combo $ \p ->
+          then flip map comboFired $ \p ->
             let (i, j) = P.pos p
              in if
                     | i == x' && j == y' -> P.next (P.Swap P.R) p
                     | i == x' + 1 && j == y' -> P.next (P.Swap P.L) p
                     | otherwise -> p
-          else combo
-   in (swapped, gen')
+          else comboFired
+   in (swapped, gen', combo', chain')

@@ -31,8 +31,9 @@ instance Render Panel String where
   render (color -> Blue) = "▽"
 
 instance Render Board String where
-  render (Board panels (getBound -> (w, h)) (Cursor x y) _) =
+  render (Board panels (getBound -> (w, h)) (Cursor x y) _ combo chain) =
     unlines $
+      ("conbo: " ++ show combo ++ ", chain: " ++ show chain) :
       reverse -- 上から下へ
         [ concat
             [ if
