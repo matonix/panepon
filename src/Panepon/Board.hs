@@ -130,87 +130,104 @@ genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
 genGround gen panels grid = genPanels gen panels [(i, - G.depth grid) | i <- [1 .. G.width grid]]
 
 nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int)
-nextPanels events grid (C.Cursor x' y') panels gen combo chain =
-  let -- tick event
-      ticked = map (P.next P.Tick) panels
-      -- lift
-      lifted =
-        if G.liftComplete grid
-          then
-            let liftApplied = map (P.next P.Lift) ticked
-                available = flip map liftApplied $ \p ->
-                  let (_, j) = P.pos p in if j > 0 then P.next P.Available p else p
-             in available
-          else ticked
-      (groundAdded, gen') = genGround gen lifted grid
-      -- count finish
-      cf =
-        flip map groundAdded $
-          P.next (P.CountFinish (P.Move P.L) moveFinish)
-            . P.next (P.CountFinish (P.Move P.R) moveFinish)
-            . P.next (P.CountFinish P.Float floatFinish)
-            . P.next (P.CountFinish P.Fall fallFinish)
-            . P.next (P.CountFinish P.Vanish vanishFinish)
-      -- bottom condition
-      loop curr prev
-        | curr == prev = curr
-        | otherwise = loop next curr
-        where
-          bottoms = flip map curr $ \p ->
-            let (i, j) = P.pos p
-             in find ((== (i, j - 1)) . P.pos) curr
-          next = flip map (zip curr bottoms) $ \(p, mp) ->
-            let s = maybe P.Empty P.state mp
-                c = maybe 0 P.count mp
-                ch = maybe False (\p' -> P.chainable p' || P.state p' == P.Empty) mp
-             in P.next (P.Bottom s c ch) p
-      bc = loop cf []
-      -- empty collect
-      ec = filter ((/= P.Empty) . P.state) bc
-      -- combo
-      comboableH = concat $
-        flip map ec $ \p ->
-          let (i, j) = P.pos p
-              ml = find ((== (i - 1, j)) . P.pos) ec
-              mr = find ((== (i + 1, j)) . P.pos) ec
-           in case (ml, mr) of
-                (Just l, Just r)
-                  | all ((P.Idle ==) . P.state) [p, l, r]
-                      && all ((P.color p ==) . P.color) [l, r] ->
-                    map P.pos [p, l, r]
-                _ -> []
-      comboableV = concat $
-        flip map ec $ \p ->
-          let (i, j) = P.pos p
-              mu = find ((== (i, j + 1)) . P.pos) ec
-              md = find ((== (i, j - 1)) . P.pos) ec
-           in case (mu, md) of
-                (Just u, Just d)
-                  | all ((P.Idle ==) . P.state) [p, u, d]
-                      && all ((P.color p ==) . P.color) [u, d] ->
-                    map P.pos [p, u, d]
-                _ -> []
-      comboFired = flip map ec $ \p ->
-        let pos = P.pos p
-         in if elem pos comboableH || elem pos comboableV then P.next P.Combo p else p
-      combo' = length $ filter (\p -> P.state p == P.Vanish && P.count p == 0) comboFired
-      -- chain
-      chainInc = any (\p -> P.state p == P.Vanish && P.count p == 0 && P.chainable p) comboFired
-      chainContinue = not . all (\p -> P.state p == P.Init || (P.state p == P.Idle && P.count p > 0)) $ filter P.chainable comboFired
-      anyVanishing = any (\p -> P.state p == P.Vanish) comboFired
-      chain'
-        | chainInc = chain + 1
-        | chainContinue = chain
-        | anyVanishing = 1
-        | otherwise = 0
-      -- swap
-      swapped =
-        if Swap `elem` events
-          then flip map comboFired $ \p ->
-            let (i, j) = P.pos p
-             in if
-                    | i == x' && j == y' -> P.next (P.Swap P.R) p
-                    | i == x' + 1 && j == y' -> P.next (P.Swap P.L) p
-                    | otherwise -> p
-          else comboFired
-   in (swapped, gen', combo', chain')
+nextPanels events grid cursor panels gen combo chain = (ss, gen', combo', chain')
+  where
+    -- tick event
+    te = tickEvent panels
+    -- lift event
+    (le, gen') = liftEvent te gen grid
+    -- count finish
+    cf = countFinish le
+    -- bottom condition
+    bc = bottomCondition cf
+    -- empty collect
+    ec = emptyCollect bc
+    -- combo start
+    cs = comboStart ec
+    -- combo
+    combo' = comboCount cs
+    -- chain
+    chain' = chainCount cs chain
+    -- swap start
+    ss = swapStart cs events cursor
+
+tickEvent :: Panels -> Panels
+tickEvent = map (P.next P.Tick)
+
+liftEvent :: ColorGenerator g => Panels -> g -> G.Grid -> (Panels, g)
+liftEvent panels gen grid = genGround gen lifted grid
+  where
+    lifted =
+      if G.liftComplete grid
+        then
+          let liftApplied = map (P.next P.Lift) panels
+              available = flip map liftApplied $ \p@(P.pos -> snd -> j) -> if j > 0 then P.next P.Available p else p
+           in available
+        else panels
+
+countFinish :: Panels -> Panels
+countFinish panels =
+  flip map panels $
+    P.next (P.CountFinish (P.Move P.L) moveFinish)
+      . P.next (P.CountFinish (P.Move P.R) moveFinish)
+      . P.next (P.CountFinish P.Float floatFinish)
+      . P.next (P.CountFinish P.Fall fallFinish)
+      . P.next (P.CountFinish P.Vanish vanishFinish)
+
+bottomCondition :: Panels -> Panels
+bottomCondition panels = loop panels []
+  where
+    loop curr prev
+      | curr == prev = curr
+      | otherwise = loop next curr
+      where
+        bottoms = flip map curr $ \(P.pos -> (i, j)) -> find ((== (i, j - 1)) . P.pos) curr
+        next = flip map (zip curr bottoms) $ \(p, mp) ->
+          let s = maybe P.Empty P.state mp
+              c = maybe 0 P.count mp
+              ch = maybe False (\p' -> P.chainable p' || P.state p' == P.Empty) mp
+           in P.next (P.Bottom s c ch) p
+
+emptyCollect :: Panels -> Panels
+emptyCollect = filter ((/= P.Empty) . P.state)
+
+comboStart :: Panels -> Panels
+comboStart panels = flip map panels $ \p@(P.pos -> pos) -> if elem pos comboableH || elem pos comboableV then P.next P.Combo p else p
+  where
+    comboableH = comboable (pred, id) (succ, id) panels
+    comboableV = comboable (id, succ) (id, pred) panels
+    comboable (ia, ja) (ib, jb) panels = concat $
+      flip map panels $ \p ->
+        let (i, j) = P.pos p
+            ma = find ((== (ia i, ja j)) . P.pos) panels
+            mb = find ((== (ib i, jb j)) . P.pos) panels
+         in case (ma, mb) of
+              (Just a, Just b)
+                | all ((P.Idle ==) . P.state) [p, a, b]
+                    && all ((P.color p ==) . P.color) [a, b] ->
+                  map P.pos [p, a, b]
+              _ -> []
+
+comboCount :: Panels -> Int
+comboCount = length . filter (\p -> P.state p == P.Vanish && P.count p == 0)
+
+chainCount :: Panels -> Int -> Int
+chainCount panels chain
+  | chainInc = chain + 1
+  | chainContinue = chain
+  | anyVanishing = 1
+  | otherwise = 0
+  where
+    chainInc = any (\p -> P.state p == P.Vanish && P.count p == 0 && P.chainable p) panels
+    chainContinue = not . all (\p -> P.state p == P.Init || (P.state p == P.Idle && P.count p > 0)) $ filter P.chainable panels
+    anyVanishing = any (\p -> P.state p == P.Vanish) panels
+
+swapStart :: Panels -> Events -> C.Cursor -> Panels
+swapStart panels events (C.Cursor x y) =
+  if Swap `elem` events
+    then flip map panels $ \p@(P.pos -> (i, j)) ->
+      if
+          | i == x && j == y -> P.next (P.Swap P.R) p
+          | i == x + 1 && j == y -> P.next (P.Swap P.L) p
+          | otherwise -> p
+    else panels
