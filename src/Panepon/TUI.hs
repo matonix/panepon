@@ -1,0 +1,152 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
+
+module Panepon.TUI where
+
+import Brick hiding (Down, Left, Right, Up, render)
+import Brick.BChan (newBChan, writeBChan)
+import qualified Brick.Widgets.Border as B
+import qualified Brick.Widgets.Border.Style as BS
+import qualified Brick.Widgets.Center as C
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Monad (forever, void)
+import Control.Monad.IO.Class (liftIO)
+import Data.Foldable
+import Data.Maybe (fromMaybe)
+import qualified Graphics.Vty as V
+import Panepon.Board
+import Panepon.Cursor (Cursor (Cursor))
+import Panepon.Grid (getBound)
+import Panepon.Panel (Color (..), Direction (..), Panel, State (..), state, color, pos)
+import Panepon.Render (Render, render)
+import Prelude hiding (Left, Right)
+
+data Game = Game
+  { events :: Events,
+    board :: Board
+  }
+
+data Tick = Tick
+
+type Name = ()
+
+-- App definition
+
+debugMain :: Board -> IO ()
+debugMain b = do
+  chan <- newBChan 10
+  forkIO $
+    forever $ do
+      writeBChan chan Tick
+      threadDelay 500000 -- #TODO make config for setting FPS
+  g <- initGame b
+  let builder = V.mkVty V.defaultConfig
+  initialVty <- builder
+  void $ customMain initialVty builder (Just chan) app g
+
+app :: App Game Tick Name
+app =
+  App
+    { appDraw = drawUI,
+      appChooseCursor = neverShowCursor,
+      appHandleEvent = handleEvent,
+      appStartEvent = return,
+      appAttrMap = const theMap
+    }
+
+-- Handling events
+
+handleEvent :: Game -> BrickEvent Name Tick -> EventM Name (Next Game)
+handleEvent g (AppEvent Tick) = continue $ step g
+handleEvent g (VtyEvent (V.EvKey V.KUp [])) = continue $ turn Up g
+handleEvent g (VtyEvent (V.EvKey V.KDown [])) = continue $ turn Down g
+handleEvent g (VtyEvent (V.EvKey V.KRight [])) = continue $ turn Right g
+handleEvent g (VtyEvent (V.EvKey V.KLeft [])) = continue $ turn Left g
+handleEvent g (VtyEvent (V.EvKey (V.KChar 'x') [])) = continue $ turn Swap g
+handleEvent g (VtyEvent (V.EvKey (V.KChar 'z') [])) = continue $ turn Lift g
+-- handleEvent g (VtyEvent (V.EvKey (V.KChar 'r') [])) = liftIO initGame >>= continue
+handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
+handleEvent g (VtyEvent (V.EvKey V.KEsc [])) = halt g
+handleEvent g _ = continue g
+
+-- #TODO implement "Env" layer steps
+
+step :: Game -> Game
+step g@(Game events board) = g {board = next events board, events = []}
+
+turn :: Event -> Game -> Game
+turn event g@(Game events _) = g {events = event : events}
+
+initGame :: Board -> IO Game
+initGame board = return $ Game [] board
+
+-- Drawing
+
+drawUI :: Game -> [Widget Name]
+drawUI g =
+  [C.center $ padRight (Pad 2) (drawStats g) <+> render g]
+
+drawStats :: Game -> Widget Name
+drawStats g =
+    vBox
+      []
+
+-- drawScore :: Int -> Widget Name
+-- drawScore n =
+--   withBorderStyle BS.unicodeBold $
+--     B.borderWithLabel (str "Score") $
+--       C.hCenter $
+--         padAll 1 $
+--           str $ show n
+
+-- drawGameOver :: Bool -> Widget Name
+-- drawGameOver dead =
+--   if dead
+--     then withAttr gameOverAttr $ C.hCenter $ str "GAME OVER"
+--     else emptyWidget
+
+-- gameOverAttr :: AttrName
+-- gameOverAttr = "gameOver"
+
+instance Render Game (Widget Name) where
+  render (Game _events board) = render board
+
+instance Render Board (Widget Name) where
+  render (Board panels (getBound -> (w, h)) (Cursor x y) _ _ _) =
+    hLimit (w*2+3) $ vLimit (h+2) $ withBorderStyle BS.unicodeBold $
+      B.borderWithLabel (str "Panepon") $
+        vBox rows
+    where
+      rows = reverse [hBox $ cellsInRow j | j <- [1 .. w + 1]]
+      cellsInRow j = concat [[renderCursor x y i j, drawCoord i j] | i <- [1 .. h]]
+      drawCoord i j = maybe renderEmpty render (find ((== (i, j)) . pos) panels)
+
+renderEmpty :: Widget Name
+renderEmpty = str " "
+
+renderCursor :: Int -> Int -> Int -> Int -> Widget Name
+renderCursor x y i j 
+  | i == x && j == y = str "["
+  | i == x + 2 && j == y = str "]"
+  | otherwise = str " "
+
+instance Render Panel (Widget Name) where
+  render (state -> Init) = str "X"
+  render (state -> Move L) = str "←"
+  render (state -> Move R) = str "→"
+  render (state -> Float) = str "F"
+  render (state -> Fall) = str "↓"
+  render (state -> Vanish) = str "V"
+  render (state -> Empty) = str "E"
+  render (color -> Red) = str "❤"
+  render (color -> Green) = str "□"
+  render (color -> Cyan) = str "▲"
+  render (color -> Purple) = str "◇"
+  render (color -> Yellow) = str "★"
+  render (color -> Blue) = str "▽"
+
+theMap :: AttrMap
+theMap = attrMap V.defAttr []
