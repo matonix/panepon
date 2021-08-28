@@ -20,7 +20,7 @@ import qualified Graphics.Vty as V
 import Panepon.Board
 import Panepon.Cursor (Cursor (Cursor))
 import Panepon.Grid (getBound)
-import Panepon.Panel (Color (..), Direction (..), Panel, State (..), state, color, pos)
+import Panepon.Panel (Color (..), Direction (..), Panel, State (..), color, pos, state)
 import Panepon.Render (Render, render)
 import Prelude hiding (Left, Right)
 
@@ -91,8 +91,8 @@ drawUI g =
 
 drawStats :: Game -> Widget Name
 drawStats g =
-    vBox
-      []
+  vBox
+    []
 
 -- drawScore :: Int -> Widget Name
 -- drawScore n =
@@ -116,37 +116,70 @@ instance Render Game (Widget Name) where
 
 instance Render Board (Widget Name) where
   render (Board panels (getBound -> (w, h)) (Cursor x y) _ _ _) =
-    hLimit (w*2+3) $ vLimit (h+2) $ withBorderStyle BS.unicodeBold $
-      B.borderWithLabel (str "Panepon") $
-        vBox rows
+    hLimit (w * 2 + 3) $
+      vLimit (h + 2) $
+        withBorderStyle BS.unicodeBold $
+          B.borderWithLabel (str "Panepon") $
+            vBox rows
     where
       rows = reverse [hBox $ cellsInRow j | j <- [1 .. w + 1]]
-      cellsInRow j = concat [[renderCursor x y i j, drawCoord i j] | i <- [1 .. h]]
-      drawCoord i j = maybe renderEmpty render (find ((== (i, j)) . pos) panels)
+      cellsInRow j = str " " : concat [renderPanel i j | i <- [1 .. h]]
+      renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor x y i j]
+        where 
+          maybePanel = find ((== (i, j)) . pos) panels
+          maybeColor = fmap color maybePanel
 
 renderEmpty :: Widget Name
 renderEmpty = str " "
 
 renderCursor :: Int -> Int -> Int -> Int -> Widget Name
-renderCursor x y i j 
-  | i == x && j == y = str "["
-  | i == x + 2 && j == y = str "]"
+renderCursor x y i j
+  | i == x - 1 && j == y = str "["
+  | i == x + 1 && j == y = str "]"
   | otherwise = str " "
 
 instance Render Panel (Widget Name) where
-  render (state -> Init) = str "X"
-  render (state -> Move L) = str "←"
-  render (state -> Move R) = str "→"
-  render (state -> Float) = str "F"
-  render (state -> Fall) = str "↓"
-  render (state -> Vanish) = str "V"
-  render (state -> Empty) = str "E"
-  render (color -> Red) = str "❤"
-  render (color -> Green) = str "□"
-  render (color -> Cyan) = str "▲"
-  render (color -> Purple) = str "◇"
-  render (color -> Yellow) = str "★"
-  render (color -> Blue) = str "▽"
+  render p = colorAttr (color p) $ renderDebug p
+
+colorAttr :: Color -> Widget Name -> Widget Name
+colorAttr Red = withAttr redAttr
+colorAttr Green = withAttr greenAttr
+colorAttr Cyan = withAttr cyanAttr
+colorAttr Purple = withAttr purpleAttr
+colorAttr Yellow = withAttr yellowAttr
+colorAttr Blue = withAttr blueAttr
+
+redAttr, greenAttr, cyanAttr, purpleAttr, yellowAttr, blueAttr :: AttrName
+redAttr = "redAttr"
+greenAttr = "greenAttr"
+cyanAttr = "cyanAttr"
+purpleAttr = "purpleAttr"
+yellowAttr = "yellowAttr"
+blueAttr = "blueAttr"
+
+renderDebug :: Panel -> Widget Name
+renderDebug (state -> Init) = str "X"
+renderDebug (state -> Move L) = str "←"
+renderDebug (state -> Move R) = str "→"
+renderDebug (state -> Float) = str "☁"
+renderDebug (state -> Fall) = str "↓"
+renderDebug (state -> Vanish) = str "☼"
+renderDebug (state -> Empty) = str "E"
+renderDebug (color -> Red) = str "❤"
+renderDebug (color -> Green) = str "■"
+renderDebug (color -> Cyan) = str "▲"
+renderDebug (color -> Purple) = str "◆"
+renderDebug (color -> Yellow) = str "★"
+renderDebug (color -> Blue) = str "▼"
 
 theMap :: AttrMap
-theMap = attrMap V.defAttr []
+theMap =
+  attrMap
+    V.defAttr
+    [ (redAttr, bg V.red),
+      (greenAttr, bg V.green),
+      (cyanAttr, bg V.cyan),
+      (purpleAttr, bg V.magenta),
+      (yellowAttr, bg V.yellow),
+      (blueAttr, bg V.blue)
+    ]
