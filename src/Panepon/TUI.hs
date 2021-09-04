@@ -142,18 +142,21 @@ instance Render Game (Widget Name) where
   render (Game _events board _debug) = render board
 
 instance Render Board (Widget Name) where
-  render (Board panels (G.getBound -> (w, h)) (C.Cursor x y) _ _ _) =
+  render board =
     hLimit (w * 2 + 3) $
       vLimit (h + 2) $
         withBorderStyle BS.unicodeBold $
           B.borderWithLabel (str "Panepon") $
             vBox rows
     where
+      C.Cursor cx cy = board ^. cursor
+      (w, h) = board ^. grid . to G.getBound
+      ps = board ^. panels
       rows = reverse [hBox $ cellsInRow j | j <- [0 .. h]]
-      cellsInRow j = renderCursor x y 0 j : concat [renderPanel i j | i <- [1 .. w]]
-      renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor x y i j]
+      cellsInRow j = renderCursor cx cy 0 j : concat [renderPanel i j | i <- [1 .. w]]
+      renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor cx cy i j]
         where
-          maybePanel = find ((== (i, j)) . P._pos) panels
+          maybePanel = find ((== (i, j)) . P._pos) ps
           maybeColor = fmap P._color maybePanel
 
 renderEmpty :: Widget Name

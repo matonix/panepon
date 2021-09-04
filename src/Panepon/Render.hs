@@ -7,6 +7,7 @@
 module Panepon.Render where
 
 import Data.Foldable
+import Lens.Micro
 import Panepon.Board
 import Panepon.Cursor
 import Panepon.Grid
@@ -31,17 +32,20 @@ instance Render Panel String where
   render (_color -> Blue) = "▽"
 
 instance Render Board String where
-  render (Board panels (getBound -> (w, h)) (Cursor x y) _ combo chain) =
+  render board =
     unlines $
-      ("conbo: " ++ show combo ++ ", chain: " ++ show chain) :
       reverse -- 上から下へ
         [ concat
             [ if
-                  | i == x && j == y -> "["
-                  | i == x + 2 && j == y -> "]"
+                  | i == cx && j == cy -> "["
+                  | i == cx + 2 && j == cy -> "]"
                   | otherwise -> " "
-                ++ maybe " " render (find ((== (i, j)) . _pos) panels)
+                ++ maybe " " render (find ((== (i, j)) . _pos) ps)
               | i <- [1 .. w + 1]
             ]
           | j <- [1 .. h]
         ]
+    where
+      Cursor cx cy = board ^. cursor
+      (w, h) = board ^. grid . to getBound
+      ps = board ^. panels
