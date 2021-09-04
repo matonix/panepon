@@ -98,7 +98,7 @@ nextCursor :: Events -> G.Grid -> C.Cursor -> C.Cursor
 nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor events'
   where
     (w, h) = G.getBound grid
-    events' = if G._lift grid == 0 then events ++ [Up] else events
+    events' = if G._liftComplete grid then events ++ [Up] else events
     toCursorEvent :: C.Cursor -> Event -> C.Event
     toCursorEvent (C.Cursor x y) Up | y < h = C.Up
     toCursorEvent (C.Cursor x y) Down | y > 1 = C.Down
@@ -132,8 +132,8 @@ genPanels gen panels poss = go poss gen panels
     go [] gen ps = (ps, gen)
     go (pos : poss) gen ps = let (p, gen') = genPanel gen ps pos in go poss gen' (p : ps)
 
--- >>> genGround (mkGen::DetGen) [] (G.Grid 2 9 0 0 False)
--- ([Panel {color = Green, state = Init, count = 0, pos = (2,0)},Panel {color = Red, state = Init, count = 0, pos = (1,0)}],DetGen)
+-- >>> genGround (mkGen::DetGen) [] (G.Grid 2 9 0 0 False False G.Stop)
+-- ([Panel {_color = Green, _state = Init, _count = 0, _pos = (2,0), _chainable = False},Panel {_color = Red, _state = Init, _count = 0, _pos = (1,0), _chainable = False}],DetGen)
 genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
 genGround gen panels grid = genPanels gen panels [(i, - G._depth grid) | i <- [1 .. G._width grid]]
 
