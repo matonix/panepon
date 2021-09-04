@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Panepon.TUI where
 
@@ -17,6 +18,8 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Foldable
 import Data.Maybe (fromMaybe)
 import qualified Graphics.Vty as V
+import Lens.Micro
+import Lens.Micro.TH
 import Panepon.Board
 import Panepon.Cursor (Cursor (Cursor))
 import Panepon.Grid (getBound)
@@ -25,9 +28,11 @@ import Panepon.Render (Render, render)
 import Prelude hiding (Left, Right)
 
 data Game = Game
-  { events :: Events,
-    board :: Board
+  { _events :: Events,
+    _board :: Board
   }
+
+makeLenses ''Game
 
 data Tick = Tick
 
@@ -75,10 +80,11 @@ handleEvent g _ = continue g
 -- #TODO implement "Env" layer steps
 
 step :: Game -> Game
-step g@(Game events board) = g {board = next events board, events = []}
+step game = game & board %~ next es & events .~ []
+  where es = game ^. events
 
 turn :: Event -> Game -> Game
-turn event g@(Game events _) = g {events = event : events}
+turn event game = game & events %~ (event :)
 
 initGame :: Board -> IO Game
 initGame board = return $ Game [] board
