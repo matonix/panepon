@@ -123,9 +123,9 @@ instance Render Board (Widget Name) where
             vBox rows
     where
       rows = reverse [hBox $ cellsInRow j | j <- [0 .. h]]
-      cellsInRow j = str " " : concat [renderPanel i j | i <- [1 .. w]]
+      cellsInRow j = renderCursor x y 0 j : concat [renderPanel i j | i <- [1 .. w]]
       renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor x y i j]
-        where 
+        where
           maybePanel = find ((== (i, j)) . _pos) panels
           maybeColor = fmap _color maybePanel
 
