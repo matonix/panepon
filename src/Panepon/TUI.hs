@@ -20,7 +20,7 @@ import qualified Graphics.Vty as V
 import Panepon.Board
 import Panepon.Cursor (Cursor (Cursor))
 import Panepon.Grid (getBound)
-import Panepon.Panel (Color (..), Direction (..), Panel, State (..), color, pos, state)
+import Panepon.Panel (Color (..), Direction (..), Panel, State (..), _color, _pos, _state)
 import Panepon.Render (Render, render)
 import Prelude hiding (Left, Right)
 
@@ -126,8 +126,8 @@ instance Render Board (Widget Name) where
       cellsInRow j = str " " : concat [renderPanel i j | i <- [1 .. h]]
       renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor x y i j]
         where 
-          maybePanel = find ((== (i, j)) . pos) panels
-          maybeColor = fmap color maybePanel
+          maybePanel = find ((== (i, j)) . _pos) panels
+          maybeColor = fmap _color maybePanel
 
 renderEmpty :: Widget Name
 renderEmpty = str " "
@@ -139,7 +139,7 @@ renderCursor x y i j
   | otherwise = str " "
 
 instance Render Panel (Widget Name) where
-  render p = colorAttr (color p) $ renderDebug p
+  render p = colorAttr (_color p) $ renderDebug p
 
 colorAttr :: Color -> Widget Name -> Widget Name
 colorAttr Red = withAttr redAttr
@@ -159,19 +159,19 @@ blueAttr = "blueAttr"
 cursorAttr = "cursorAttr"
 
 renderDebug :: Panel -> Widget Name
-renderDebug (state -> Init) = str "X"
-renderDebug (state -> Move L) = str "←"
-renderDebug (state -> Move R) = str "→"
-renderDebug (state -> Float) = str "☁"
-renderDebug (state -> Fall) = str "↓"
-renderDebug (state -> Vanish) = str "☼"
-renderDebug (state -> Empty) = str "E"
-renderDebug (color -> Red) = str "❤"
-renderDebug (color -> Green) = str "■"
-renderDebug (color -> Cyan) = str "▲"
-renderDebug (color -> Purple) = str "◆"
-renderDebug (color -> Yellow) = str "★"
-renderDebug (color -> Blue) = str "▼"
+renderDebug (_state -> Init) = str "X"
+renderDebug (_state -> Move L) = str "←"
+renderDebug (_state -> Move R) = str "→"
+renderDebug (_state -> Float) = str "☁"
+renderDebug (_state -> Fall) = str "↓"
+renderDebug (_state -> Vanish) = str "☼"
+renderDebug (_state -> Empty) = str "E"
+renderDebug (_color -> Red) = str "❤"
+renderDebug (_color -> Green) = str "■"
+renderDebug (_color -> Cyan) = str "▲"
+renderDebug (_color -> Purple) = str "◆"
+renderDebug (_color -> Yellow) = str "★"
+renderDebug (_color -> Blue) = str "▼"
 
 theMap :: AttrMap
 theMap =

@@ -16,19 +16,19 @@ class Render a b where
   render :: a -> b
 
 instance Render Panel String where
-  render (state -> Init) = "X"
-  render (state -> Move L) = "←"
-  render (state -> Move R) = "→"
-  render (state -> Float) = "F"
-  render (state -> Fall) = "↓"
-  render (state -> Vanish) = "V"
-  render (state -> Empty) = "E"
-  render (color -> Red) = "❤"
-  render (color -> Green) = "□"
-  render (color -> Cyan) = "▲"
-  render (color -> Purple) = "◇"
-  render (color -> Yellow) = "★"
-  render (color -> Blue) = "▽"
+  render (_state -> Init) = "X"
+  render (_state -> Move L) = "←"
+  render (_state -> Move R) = "→"
+  render (_state -> Float) = "F"
+  render (_state -> Fall) = "↓"
+  render (_state -> Vanish) = "V"
+  render (_state -> Empty) = "E"
+  render (_color -> Red) = "❤"
+  render (_color -> Green) = "□"
+  render (_color -> Cyan) = "▲"
+  render (_color -> Purple) = "◇"
+  render (_color -> Yellow) = "★"
+  render (_color -> Blue) = "▽"
 
 instance Render Board String where
   render (Board panels (getBound -> (w, h)) (Cursor x y) _ combo chain) =
@@ -40,7 +40,7 @@ instance Render Board String where
                   | i == x && j == y -> "["
                   | i == x + 2 && j == y -> "]"
                   | otherwise -> " "
-                ++ maybe " " render (find ((== (i, j)) . pos) panels)
+                ++ maybe " " render (find ((== (i, j)) . _pos) panels)
               | i <- [1 .. w + 1]
             ]
           | j <- [1 .. h]

@@ -25,6 +25,8 @@ common shared-properties
     , base   ^>=4.14.1.0
     , brick
     , vty
+    , microlens
+    , microlens-th
 
 executable panepon
   import:         shared-properties

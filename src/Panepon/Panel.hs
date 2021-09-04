@@ -1,6 +1,10 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Panepon.Panel where
+
+import Lens.Micro.TH ( makeLenses )
+import Lens.Micro ( Lens', (&), (%~), (.~), _1, _2 )
 
 data Color = Red | Green | Cyan | Purple | Yellow | Blue
   deriving (Eq, Show)
@@ -16,13 +20,15 @@ type Count = Int
 type Pos = (Int, Int)
 
 data Panel = Panel
-  { color :: Color,
-    state :: State,
-    count :: Count,
-    pos :: Pos,
-    chainable :: Bool
+  { _color :: Color,
+    _state :: State,
+    _count :: Count,
+    _pos :: Pos,
+    _chainable :: Bool
   }
   deriving (Eq, Show)
+
+makeLenses ''Panel
 
 -- イベントの発行は発行者の責任（チェックはPanel側では行わない）
 data Event
@@ -48,19 +54,28 @@ isMovable Fall = True
 isMovable _ = False
 
 next :: Event -> Panel -> Panel
-next Tick panel@(count -> c) = panel {count = c + 1}
-next Lift panel@(pos -> (x, y)) = panel {pos = (x, y + 1)}
-next (CountFinish (Move d) c) panel@(state -> Move d') | count panel == c && d == d' = panel {state = Idle, count = 0}
-next (CountFinish Float c) panel@(state -> Float) | count panel == c = panel {state = Fall, count = 0}
-next (CountFinish Fall c) panel@(state -> Fall) | count panel == c = let (x, y) = pos panel in panel {state = Fall, count = 0, pos = (x, y - 1)}
-next (CountFinish Vanish c) panel@(state -> Vanish) | count panel == c = panel {state = Empty, count = 0}
-next (Bottom Empty _ chainable) panel@(state -> Idle) = panel {state = Float, count = 0, chainable = chainable}
-next (Bottom Fall _ chainable) panel@(state -> Idle) = panel {state = Fall, count = 0, chainable = chainable}
-next (Bottom Float c _) panel@(state -> Fall) = panel {state = Float, count = c}
-next (Bottom b _ _) panel@(state -> Fall) | isGround b = panel {state = Idle, count = 0}
-next (Bottom b _ _) panel@(state -> Idle) | isGround b && count panel > 0 = panel {state = Idle, chainable = False}
-next Available panel@(state -> Init) = panel {state = Idle}
-next Combo panel@(state -> Idle) = panel {state = Vanish, count = 0}
-next (Swap L) panel@(state -> s) | isMovable s = let (x, y) = pos panel in panel {state = Move L, count = 0, pos = (x - 1, y)}
-next (Swap R) panel@(state -> s) | isMovable s = let (x, y) = pos panel in panel {state = Move R, count = 0, pos = (x + 1, y)}
+next Tick panel = panel & count %~ succ
+next Lift panel = panel & posY %~ succ
+next (CountFinish (Move d) c) panel@(_state -> Move d') | _count panel == c && d == d' = panel & state .~ Idle & countReset
+next (CountFinish Float c) panel@(_state -> Float) | _count panel == c = panel & state .~ Fall & countReset
+next (CountFinish Fall c) panel@(_state -> Fall) | _count panel == c = panel & state .~ Fall & countReset & posY %~ pred
+next (CountFinish Vanish c) panel@(_state -> Vanish) | _count panel == c = panel & state .~ Empty & countReset
+next (Bottom Empty _ ch) panel@(_state -> Idle) = panel & state .~ Float & countReset & chainable .~ ch
+next (Bottom Fall _ ch) panel@(_state -> Idle) = panel & state .~ Fall & countReset & chainable .~ ch
+next (Bottom Float c _) panel@(_state -> Fall) = panel & state .~ Float & countReset
+next (Bottom b _ _) panel@(_state -> Fall) | isGround b = panel & state .~ Idle & countReset
+next (Bottom b _ _) panel@(_state -> Idle) | isGround b && _count panel > 0 = panel & state .~ Idle & chainable .~ False
+next Available panel@(_state -> Init) = panel & state .~ Idle
+next Combo panel@(_state -> Idle) = panel & state .~ Vanish & countReset
+next (Swap L) panel@(_state -> s) | isMovable s = panel & state .~ Move L & countReset & posX %~ pred
+next (Swap R) panel@(_state -> s) | isMovable s = panel & state .~ Move R & countReset & posX %~ succ
 next _ panel = panel
+
+countReset :: Panel -> Panel
+countReset = count .~ 0
+
+posX :: Lens' Panel Int
+posX = pos . _1
+
+posY :: Lens' Panel Int
+posY = pos . _2

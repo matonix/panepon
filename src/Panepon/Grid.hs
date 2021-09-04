@@ -1,21 +1,26 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Panepon.Grid where
 
-import Control.Arrow
-import Data.Ratio
+import Control.Arrow ( Arrow((&&&)) )
+import Data.Ratio ( (%) )
+import Lens.Micro.TH ( makeLenses )
+import Lens.Micro ( (&), (.~) )
 
 -- 1-indexed grid, i.e., 1..w, 1..h and -d..0
 -- lift represents ratio to the height of panel, i.e., lift == 1 -> lift complete
 data Grid = Grid
-  { width :: Int,
-    height :: Int,
-    depth :: Int,
-    lift :: Rational,
-    liftComplete :: Bool,
-    forceMode :: Bool
+  {_width :: Int,
+   _height :: Int,
+   _depth :: Int,
+   _lift :: Rational,
+   _liftComplete :: Bool,
+   _forceMode :: Bool
   }
   deriving (Show)
+
+makeLenses ''Grid
 
 data Event
   = Auto Int -- frame / panel
@@ -23,11 +28,11 @@ data Event
   | Stop
 
 getBound :: Grid -> (Int, Int)
-getBound = width &&& height
+getBound = _width &&& _height
 
 next :: Event -> Grid -> Grid
-next (Auto f) grid@(lift -> l) = let nextLift = tick l f in grid {lift = nextLift, liftComplete = nextLift == 0, forceMode = False}
-next (Force f) grid@(lift -> l) = let nextLift = tick l f in grid {lift = nextLift, liftComplete = nextLift == 0, forceMode = True}
+next (Auto f) grid@(_lift -> l) = let nextLift = tick l f in grid & lift .~ nextLift & liftComplete .~ (nextLift == 0) & forceMode .~ False
+next (Force f) grid@(_lift -> l) = let nextLift = tick l f in grid & lift .~ nextLift & liftComplete .~ (nextLift == 0) & forceMode .~ True
 next Stop grid = grid
 
 tick :: Rational -> Int -> Rational
