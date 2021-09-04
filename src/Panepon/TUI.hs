@@ -134,8 +134,8 @@ renderEmpty = str " "
 
 renderCursor :: Int -> Int -> Int -> Int -> Widget Name
 renderCursor x y i j
-  | i == x - 1 && j == y = str "["
-  | i == x + 1 && j == y = str "]"
+  | i == x - 1 && j == y = withAttr cursorAttr $ str "["
+  | i == x + 1 && j == y = withAttr cursorAttr $ str "]"
   | otherwise = str " "
 
 instance Render Panel (Widget Name) where
@@ -149,13 +149,14 @@ colorAttr Purple = withAttr purpleAttr
 colorAttr Yellow = withAttr yellowAttr
 colorAttr Blue = withAttr blueAttr
 
-redAttr, greenAttr, cyanAttr, purpleAttr, yellowAttr, blueAttr :: AttrName
+redAttr, greenAttr, cyanAttr, purpleAttr, yellowAttr, blueAttr, cursorAttr :: AttrName
 redAttr = "redAttr"
 greenAttr = "greenAttr"
 cyanAttr = "cyanAttr"
 purpleAttr = "purpleAttr"
 yellowAttr = "yellowAttr"
 blueAttr = "blueAttr"
+cursorAttr = "cursorAttr"
 
 renderDebug :: Panel -> Widget Name
 renderDebug (state -> Init) = str "X"
@@ -176,10 +177,11 @@ theMap :: AttrMap
 theMap =
   attrMap
     V.defAttr
-    [ (redAttr, bg V.red),
-      (greenAttr, bg V.green),
-      (cyanAttr, bg V.cyan),
-      (purpleAttr, bg V.magenta),
-      (yellowAttr, bg V.yellow),
-      (blueAttr, bg V.blue)
+    [ (redAttr, V.black `on` V.red),
+      (greenAttr, V.black `on` V.green),
+      (cyanAttr, V.black `on` V.cyan),
+      (purpleAttr, V.black `on` V.magenta),
+      (yellowAttr, V.black `on` V.yellow),
+      (blueAttr, V.black `on` V.blue),
+      (cursorAttr, V.currentAttr `V.withStyle` V.bold `V.withForeColor` V.white)
     ]
