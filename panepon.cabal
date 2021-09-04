@@ -27,6 +27,7 @@ common shared-properties
     , vty
     , microlens
     , microlens-th
+    , timeit
 
 executable panepon
   import:         shared-properties

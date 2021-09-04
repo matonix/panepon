@@ -2,8 +2,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Panepon.TUI where
 
@@ -21,15 +22,24 @@ import qualified Graphics.Vty as V
 import Lens.Micro
 import Lens.Micro.TH
 import Panepon.Board
-import Panepon.Cursor (Cursor (Cursor))
-import Panepon.Grid (getBound)
-import Panepon.Panel (Color (..), Direction (..), Panel, State (..), _color, _pos, _state)
+import qualified Panepon.Cursor as C
+import qualified Panepon.Grid as G
+import qualified Panepon.Panel as P
 import Panepon.Render (Render, render)
+import System.TimeIt (timeItT)
+import Text.Printf
 import Prelude hiding (Left, Right)
+
+newtype Debug = Debug
+  { _duration :: Double
+  }
+
+makeLenses ''Debug
 
 data Game = Game
   { _events :: Events,
-    _board :: Board
+    _board :: Board,
+    _debug :: Debug
   }
 
 makeLenses ''Game
@@ -65,7 +75,9 @@ app =
 -- Handling events
 
 handleEvent :: Game -> BrickEvent Name Tick -> EventM Name (Next Game)
-handleEvent g (AppEvent Tick) = continue $ step g
+handleEvent g (AppEvent Tick) = do
+  (d, g') <- liftIO $ timeItT (step g)
+  continue $ g' & debug . duration .~ d
 handleEvent g (VtyEvent (V.EvKey V.KUp [])) = continue $ turn Up g
 handleEvent g (VtyEvent (V.EvKey V.KDown [])) = continue $ turn Down g
 handleEvent g (VtyEvent (V.EvKey V.KRight [])) = continue $ turn Right g
@@ -79,15 +91,16 @@ handleEvent g _ = continue g
 
 -- #TODO implement "Env" layer steps
 
-step :: Game -> Game
-step game = game & board %~ next es & events .~ []
-  where es = game ^. events
+step :: Game -> IO Game
+step game = return $ game & board %~ next es & events .~ []
+  where
+    es = game ^. events
 
 turn :: Event -> Game -> Game
 turn event game = game & events %~ (event :)
 
 initGame :: Board -> IO Game
-initGame board = return $ Game [] board
+initGame board = return $ Game [] board (Debug 0)
 
 -- Drawing
 
@@ -97,16 +110,24 @@ drawUI g =
 
 drawStats :: Game -> Widget Name
 drawStats g =
-  vBox
-    []
+  hLimit 22 $ drawDebugInfo (g ^. board) (g ^. debug)
 
--- drawScore :: Int -> Widget Name
--- drawScore n =
---   withBorderStyle BS.unicodeBold $
---     B.borderWithLabel (str "Score") $
---       C.hCenter $
---         padAll 1 $
---           str $ show n
+drawDebugInfo :: Board -> Debug -> Widget Name
+drawDebugInfo board debug =
+  withBorderStyle BS.unicodeBold $
+    B.borderWithLabel (str "Info") $
+      C.hCenter $
+        vBox
+          [ drawStrShow "combo" $ board ^. combo,
+            drawStrShow "chain" $ board ^. chain,
+            drawStrShow "lift" $ board ^. grid . G.lift,
+            drawStrShow "forceMode" $ board ^. grid . G.forceMode,
+            drawStrShow "liftEvent" $ board ^. grid . G.prevEvent,
+            drawStr "duration" $ printf "%.4fms" $ debug ^. duration . to (* 1000)
+          ]
+  where
+    drawStr name dat = str (name ++ ": " ++ dat)
+    drawStrShow name dat = str (name ++ ": " ++ show dat)
 
 -- drawGameOver :: Bool -> Widget Name
 -- drawGameOver dead =
@@ -118,10 +139,10 @@ drawStats g =
 -- gameOverAttr = "gameOver"
 
 instance Render Game (Widget Name) where
-  render (Game _events board) = render board
+  render (Game _events board _debug) = render board
 
 instance Render Board (Widget Name) where
-  render (Board panels (getBound -> (w, h)) (Cursor x y) _ _ _) =
+  render (Board panels (G.getBound -> (w, h)) (C.Cursor x y) _ _ _) =
     hLimit (w * 2 + 3) $
       vLimit (h + 2) $
         withBorderStyle BS.unicodeBold $
@@ -132,8 +153,8 @@ instance Render Board (Widget Name) where
       cellsInRow j = renderCursor x y 0 j : concat [renderPanel i j | i <- [1 .. w]]
       renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor x y i j]
         where
-          maybePanel = find ((== (i, j)) . _pos) panels
-          maybeColor = fmap _color maybePanel
+          maybePanel = find ((== (i, j)) . P._pos) panels
+          maybeColor = fmap P._color maybePanel
 
 renderEmpty :: Widget Name
 renderEmpty = str " "
@@ -144,16 +165,16 @@ renderCursor x y i j
   | i == x + 1 && j == y = withAttr cursorAttr $ str "]"
   | otherwise = str " "
 
-instance Render Panel (Widget Name) where
-  render p = colorAttr (_color p) $ renderDebug p
+instance Render P.Panel (Widget Name) where
+  render p = colorAttr (P._color p) $ renderDebug p
 
-colorAttr :: Color -> Widget Name -> Widget Name
-colorAttr Red = withAttr redAttr
-colorAttr Green = withAttr greenAttr
-colorAttr Cyan = withAttr cyanAttr
-colorAttr Purple = withAttr purpleAttr
-colorAttr Yellow = withAttr yellowAttr
-colorAttr Blue = withAttr blueAttr
+colorAttr :: P.Color -> Widget Name -> Widget Name
+colorAttr P.Red = withAttr redAttr
+colorAttr P.Green = withAttr greenAttr
+colorAttr P.Cyan = withAttr cyanAttr
+colorAttr P.Purple = withAttr purpleAttr
+colorAttr P.Yellow = withAttr yellowAttr
+colorAttr P.Blue = withAttr blueAttr
 
 redAttr, greenAttr, cyanAttr, purpleAttr, yellowAttr, blueAttr, cursorAttr :: AttrName
 redAttr = "redAttr"
@@ -164,20 +185,20 @@ yellowAttr = "yellowAttr"
 blueAttr = "blueAttr"
 cursorAttr = "cursorAttr"
 
-renderDebug :: Panel -> Widget Name
-renderDebug (_state -> Init) = str "X"
-renderDebug (_state -> Move L) = str "←"
-renderDebug (_state -> Move R) = str "→"
-renderDebug (_state -> Float) = str "☁"
-renderDebug (_state -> Fall) = str "↓"
-renderDebug (_state -> Vanish) = str "☼"
-renderDebug (_state -> Empty) = str "E"
-renderDebug (_color -> Red) = str "❤"
-renderDebug (_color -> Green) = str "■"
-renderDebug (_color -> Cyan) = str "▲"
-renderDebug (_color -> Purple) = str "◆"
-renderDebug (_color -> Yellow) = str "★"
-renderDebug (_color -> Blue) = str "▼"
+renderDebug :: P.Panel -> Widget Name
+renderDebug (P._state -> P.Init) = str "X"
+renderDebug (P._state -> P.Move P.L) = str "←"
+renderDebug (P._state -> P.Move P.R) = str "→"
+renderDebug (P._state -> P.Float) = str "☁"
+renderDebug (P._state -> P.Fall) = str "↓"
+renderDebug (P._state -> P.Vanish) = str "☼"
+renderDebug (P._state -> P.Empty) = str "E"
+renderDebug (P._color -> P.Red) = str "❤"
+renderDebug (P._color -> P.Green) = str "■"
+renderDebug (P._color -> P.Cyan) = str "▲"
+renderDebug (P._color -> P.Purple) = str "◆"
+renderDebug (P._color -> P.Yellow) = str "★"
+renderDebug (P._color -> P.Blue) = str "▼"
 
 theMap :: AttrMap
 theMap =
