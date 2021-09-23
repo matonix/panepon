@@ -145,15 +145,13 @@ tickEvent :: Panels -> Panels
 tickEvent = map (P.next P.Tick)
 
 liftEvent :: ColorGenerator g => Panels -> g -> G.Grid -> (Panels, g)
-liftEvent panels gen grid = genGround gen lifted grid
-  where
-    lifted =
-      if G._liftComplete grid
-        then
-          let liftApplied = map (P.next P.Lift) panels
-              available = flip map liftApplied $ \p@(P._pos -> snd -> j) -> if j > 0 then P.next P.Available p else p
-           in available
-        else panels
+liftEvent panels gen grid =
+  if G._liftComplete grid
+    then
+      let liftApplied = map (P.next P.Lift) panels
+          available = flip map liftApplied $ \p@(P._pos -> snd -> j) -> if j > 0 then P.next P.Available p else p
+       in genGround gen available grid
+    else (panels, gen)
 
 countFinish :: Rule -> Panels -> Panels
 countFinish rule panels =

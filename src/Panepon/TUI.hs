@@ -17,6 +17,7 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.Foldable
+import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Graphics.Vty as V
 import Lens.Micro
@@ -110,10 +111,11 @@ drawUI g =
 
 drawStats :: Game -> Widget Name
 drawStats g =
-  hLimit 22 
-    $ vBox [ drawDebugInfo (g ^. board) (g ^. debug)
-           , padTop (Pad 2) $ drawGameOver (g ^. board . dead)
-    ]
+  hLimit 22 $
+    vBox
+      [ drawDebugInfo (g ^. board) (g ^. debug),
+        padTop (Pad 2) $ drawGameOver (g ^. board . dead)
+      ]
 
 drawDebugInfo :: Board -> Debug -> Widget Name
 drawDebugInfo board debug =
@@ -121,8 +123,7 @@ drawDebugInfo board debug =
     B.borderWithLabel (str "Info") $
       C.hCenter $
         vBox
-          [ drawStrShow "dead" $ board ^. dead,
-            drawStrShow "combo" $ board ^. combo,
+          [ drawStrShow "combo" $ board ^. combo,
             drawStrShow "chain" $ board ^. chain,
             drawStrShow "lift" $ board ^. grid . G.lift,
             drawStrShow "forceMode" $ board ^. grid . G.forceMode,
