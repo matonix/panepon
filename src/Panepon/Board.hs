@@ -1,50 +1,27 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns #-}
 
-{-# LANGUAGE FlexibleContexts #-}
 module Panepon.Board where
 
 import Data.Foldable
 import Data.List
 import Data.Maybe
+import Lens.Micro
+import Lens.Micro.TH
 import qualified Panepon.Cursor as C
 import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
+import Panepon.Rule
 import Prelude hiding (Left, Right)
-import Lens.Micro.TH
-import Lens.Micro
-
--- rules
-
-moveFinish :: Int
-moveFinish = 1
-
-floatFinish :: Int
-floatFinish = 1
-
-fallFinish :: Int
-fallFinish = 1
-
--- TODO パネルの数に応じた変化
-vanishFinish :: Int
-vanishFinish = 1
-
-liftFinish :: Int
-liftFinish = 2
-
-forceLiftFinish :: Int
-forceLiftFinish = 3
-
-availableColors :: [P.Color]
-availableColors = [P.Red, P.Green, P.Cyan, P.Purple, P.Yellow, P.Blue]
 
 type Panels = [P.Panel]
 
 class ColorGenerator g where
   getNext :: g -> (P.Color, g)
-  mkGen :: g
+  mkGen :: [P.Color] -> g
 
 -- deterministic
 -- #TODO 記述順が影響するのを回避する（mkLensesの前にすべて宣言済みとなる必要がある）
@@ -52,13 +29,14 @@ newtype DetGen = DetGen [P.Color]
 
 instance ColorGenerator DetGen where
   getNext (DetGen (c : cs)) = (c, DetGen cs)
-  mkGen = DetGen $ cycle $ concat $ permutations availableColors
+  mkGen availableColors = DetGen $ cycle $ concat $ permutations availableColors
 
 instance Show DetGen where
   show = const "DetGen"
 
 data Board = Board
-  { _panels :: Panels,
+  { _rule :: Rule,
+    _panels :: Panels,
     _grid :: G.Grid,
     _cursor :: C.Cursor,
     _gen :: DetGen,
@@ -82,19 +60,19 @@ data Event
 type Events = [Event]
 
 next :: Events -> Board -> Board
-next events (Board panels grid cursor gen combo chain False) =
-  let grid' = nextGrid events panels grid
+next events (Board rule panels grid cursor gen combo chain False) =
+  let grid' = nextGrid rule events panels grid
       cursor' = nextCursor events grid' cursor
-      (panels', gen', combo', chain', dead') = nextPanels events grid' cursor' panels gen combo chain
-   in Board panels' grid' cursor' gen' combo' chain' dead'
+      (panels', gen', combo', chain', dead') = nextPanels rule events grid' cursor' panels gen combo chain
+   in Board rule panels' grid' cursor' gen' combo' chain' dead'
 next events board@(_dead -> True) = board
 
-nextGrid :: Events -> Panels -> G.Grid -> G.Grid
-nextGrid events panels grid
+nextGrid :: Rule -> Events -> Panels -> G.Grid -> G.Grid
+nextGrid rule events panels grid
   | not $ all (\(P._state -> s) -> s == P.Init || s == P.Idle) panels = G.next G.Stop grid
   --  | has (each . P.state . to (== P.Init)) panels = G.next G.Stop grid
-  | Lift `elem` events || (G._forceMode grid && not (G._liftComplete grid)) = G.next (G.Force forceLiftFinish) grid
-  | otherwise = G.next (G.Auto liftFinish) grid
+  | Lift `elem` events || (G._forceMode grid && not (G._liftComplete grid)) = G.next (G.Force $ rule ^. forceLiftFinish) grid
+  | otherwise = G.next (G.Auto $ rule ^. liftFinish) grid
 
 nextCursor :: Events -> G.Grid -> C.Cursor -> C.Cursor
 nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor events'
@@ -122,7 +100,7 @@ genPanel gen panels pos@(i, j) = (P.Panel c P.Init 0 pos False, gen')
         ml2 = find ((== (i - 2, j)) . P._pos) panels
         mr1 = find ((== (i + 1, j)) . P._pos) panels
         mr2 = find ((== (i + 2, j)) . P._pos) panels
-        sameOrNothing (Just a) (Just b) | P._color a == P._color b = Just $ P._color a
+        sameOrNothing (Just a) (Just b) | a ^. P.color == b ^. P.color = a ^? P.color
         sameOrNothing _ _ = Nothing
         muc = sameOrNothing mu1 mu2
         mlc = sameOrNothing ml1 ml2
@@ -139,15 +117,15 @@ genPanels gen panels poss = go poss gen panels
 genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
 genGround gen panels grid = genPanels gen panels [(i, - G._depth grid) | i <- [1 .. G._width grid]]
 
-nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int, Bool)
-nextPanels events grid cursor panels gen combo chain = (ss, gen', combo', chain', dead)
+nextPanels :: ColorGenerator g => Rule -> Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int, Bool)
+nextPanels rule events grid cursor panels gen combo chain = (ss, gen', combo', chain', dead)
   where
     -- tick event
     te = tickEvent panels
     -- lift event
     (le, gen') = liftEvent te gen grid
     -- count finish
-    cf = countFinish le
+    cf = countFinish rule le
     -- bottom condition
     bc = bottomCondition cf
     -- empty collect
@@ -177,14 +155,14 @@ liftEvent panels gen grid = genGround gen lifted grid
            in available
         else panels
 
-countFinish :: Panels -> Panels
-countFinish panels =
+countFinish :: Rule -> Panels -> Panels
+countFinish rule panels =
   flip map panels $
-    P.next (P.CountFinish (P.Move P.L) moveFinish)
-      . P.next (P.CountFinish (P.Move P.R) moveFinish)
-      . P.next (P.CountFinish P.Float floatFinish)
-      . P.next (P.CountFinish P.Fall fallFinish)
-      . P.next (P.CountFinish P.Vanish vanishFinish)
+    P.next (P.CountFinish (P.Move P.L) $ rule ^. moveFinish)
+      . P.next (P.CountFinish (P.Move P.R) $ rule ^. moveFinish)
+      . P.next (P.CountFinish P.Float $ rule ^. floatFinish)
+      . P.next (P.CountFinish P.Fall $ rule ^. fallFinish)
+      . P.next (P.CountFinish P.Vanish $ rule ^. vanishFinish)
 
 bottomCondition :: Panels -> Panels
 bottomCondition panels = loop panels []
@@ -245,6 +223,7 @@ swapStart panels events (C.Cursor x y) =
     else panels
 
 checkDead :: G.Grid -> Panels -> Bool
-checkDead grid panels = grid ^. G.prevEvent /= G.Stop 
-  && grid ^. G.liftComplete
-  && any (\p -> p ^. P.pos . _2 == grid ^. G.height) panels 
+checkDead grid panels =
+  grid ^. G.prevEvent /= G.Stop
+    && grid ^. G.liftComplete
+    && any (\p -> p ^. P.pos . _2 == grid ^. G.height) panels

@@ -1,10 +1,12 @@
 module Panepon.Read where
 
 import Data.Maybe
+import Lens.Micro
 import Panepon.Board
 import Panepon.Cursor
 import Panepon.Grid
 import Panepon.Panel
+import Panepon.Rule
 
 parse :: Char -> Maybe Color
 parse 'R' = Just Red
@@ -33,6 +35,6 @@ toBoard ss =
       h = length ss
       d = 2
       ps = toPanels ss
-      gen = mkGen
+      gen = mkGen $ debugRule ^. availableColors
       (panels, gen') = genPanels gen ps [(i, j) | i <- [1 .. w], j <- [- d .. 0]]
-   in Board panels (Grid w h d 0 False False Stop) (Cursor 3 3) gen' 0 0 False
+   in Board debugRule panels (Grid w h d 0 False False Stop) (Cursor 3 3) gen' 0 0 False
