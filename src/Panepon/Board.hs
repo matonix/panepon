@@ -63,7 +63,8 @@ data Board = Board
     _cursor :: C.Cursor,
     _gen :: DetGen,
     _combo :: Int,
-    _chain :: Int
+    _chain :: Int,
+    _dead :: Bool
   }
   deriving (Show)
 
@@ -81,11 +82,12 @@ data Event
 type Events = [Event]
 
 next :: Events -> Board -> Board
-next events (Board panels grid cursor gen combo chain) =
+next events (Board panels grid cursor gen combo chain False) =
   let grid' = nextGrid events panels grid
       cursor' = nextCursor events grid' cursor
-      (panels', gen', combo', chain') = nextPanels events grid' cursor' panels gen combo chain
-   in Board panels' grid' cursor' gen' combo' chain'
+      (panels', gen', combo', chain', dead') = nextPanels events grid' cursor' panels gen combo chain
+   in Board panels' grid' cursor' gen' combo' chain' dead'
+next events board@(_dead -> True) = board
 
 nextGrid :: Events -> Panels -> G.Grid -> G.Grid
 nextGrid events panels grid
@@ -137,8 +139,8 @@ genPanels gen panels poss = go poss gen panels
 genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
 genGround gen panels grid = genPanels gen panels [(i, - G._depth grid) | i <- [1 .. G._width grid]]
 
-nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int)
-nextPanels events grid cursor panels gen combo chain = (ss, gen', combo', chain')
+nextPanels :: ColorGenerator g => Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int, Bool)
+nextPanels events grid cursor panels gen combo chain = (ss, gen', combo', chain', dead)
   where
     -- tick event
     te = tickEvent panels
@@ -158,6 +160,8 @@ nextPanels events grid cursor panels gen combo chain = (ss, gen', combo', chain'
     chain' = chainCount cs chain
     -- swap start
     ss = swapStart cs events cursor
+    -- check dead
+    dead = checkDead grid ss
 
 tickEvent :: Panels -> Panels
 tickEvent = map (P.next P.Tick)
@@ -239,3 +243,8 @@ swapStart panels events (C.Cursor x y) =
           | i == x + 1 && j == y -> P.next (P.Swap P.L) p
           | otherwise -> p
     else panels
+
+checkDead :: G.Grid -> Panels -> Bool
+checkDead grid panels = grid ^. G.prevEvent /= G.Stop 
+  && grid ^. G.liftComplete
+  && any (\p -> p ^. P.pos . _2 == grid ^. G.height) panels 

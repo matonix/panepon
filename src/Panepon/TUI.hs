@@ -84,7 +84,7 @@ handleEvent g (VtyEvent (V.EvKey V.KRight [])) = continue $ turn Right g
 handleEvent g (VtyEvent (V.EvKey V.KLeft [])) = continue $ turn Left g
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'x') [])) = continue $ turn Swap g
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'z') [])) = continue $ turn Lift g
--- handleEvent g (VtyEvent (V.EvKey (V.KChar 'r') [])) = liftIO initGame >>= continue
+handleEvent g (VtyEvent (V.EvKey (V.KChar 'r') [])) = liftIO initGame >>= continue
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc [])) = halt g
 handleEvent g _ = continue g
@@ -110,7 +110,10 @@ drawUI g =
 
 drawStats :: Game -> Widget Name
 drawStats g =
-  hLimit 22 $ drawDebugInfo (g ^. board) (g ^. debug)
+  hLimit 22 
+    $ vBox [ drawDebugInfo (g ^. board) (g ^. debug)
+           , padTop (Pad 2) $ drawGameOver (g ^. board . dead)
+    ]
 
 drawDebugInfo :: Board -> Debug -> Widget Name
 drawDebugInfo board debug =
@@ -118,7 +121,8 @@ drawDebugInfo board debug =
     B.borderWithLabel (str "Info") $
       C.hCenter $
         vBox
-          [ drawStrShow "combo" $ board ^. combo,
+          [ drawStrShow "dead" $ board ^. dead,
+            drawStrShow "combo" $ board ^. combo,
             drawStrShow "chain" $ board ^. chain,
             drawStrShow "lift" $ board ^. grid . G.lift,
             drawStrShow "forceMode" $ board ^. grid . G.forceMode,
@@ -129,14 +133,14 @@ drawDebugInfo board debug =
     drawStr name dat = str (name ++ ": " ++ dat)
     drawStrShow name dat = str (name ++ ": " ++ show dat)
 
--- drawGameOver :: Bool -> Widget Name
--- drawGameOver dead =
---   if dead
---     then withAttr gameOverAttr $ C.hCenter $ str "GAME OVER"
---     else emptyWidget
+drawGameOver :: Bool -> Widget Name
+drawGameOver dead =
+  if dead
+    then withAttr gameOverAttr $ C.hCenter $ str "GAME OVER"
+    else emptyWidget
 
--- gameOverAttr :: AttrName
--- gameOverAttr = "gameOver"
+gameOverAttr :: AttrName
+gameOverAttr = "gameOver"
 
 instance Render Game (Widget Name) where
   render (Game _events board _debug) = render board

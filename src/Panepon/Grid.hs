@@ -25,7 +25,7 @@ data Event
   = Auto Int -- frame / panel
   | Force Int -- frame / panel
   | Stop
-  deriving (Show)
+  deriving (Show, Eq)
 
 makeLenses ''Grid
 

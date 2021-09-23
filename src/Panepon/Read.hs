@@ -34,5 +34,5 @@ toBoard ss =
       d = 2
       ps = toPanels ss
       gen = mkGen
-      (panels, gen') = genPanels gen ps [(i, j) | i <- [1 .. w], j <- [-d .. 0]]
-   in Board panels (Grid w h d 0 False False Stop) (Cursor 3 3) gen' 0 0
+      (panels, gen') = genPanels gen ps [(i, j) | i <- [1 .. w], j <- [- d .. 0]]
+   in Board panels (Grid w h d 0 False False Stop) (Cursor 3 3) gen' 0 0 False
