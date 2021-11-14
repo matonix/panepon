@@ -37,4 +37,4 @@ toBoard ss =
       ps = toPanels ss
       gen = mkGen $ debugRule ^. availableColors
       (panels, gen') = genPanels gen ps [(i, j) | i <- [1 .. w], j <- [- d .. 0]]
-   in Board debugRule panels (Grid w h d 0 False False Stop) (Cursor 3 3) gen' 0 0 False
+   in Board debugRule panels (Grid w h d 0 False False Stop) (Cursor 3 3) gen' 0 0 0 False

@@ -18,18 +18,19 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Foldable
 import Data.List
 import Data.Maybe (fromMaybe)
+import Data.Ratio (numerator, denominator)
 import qualified Graphics.Vty as V
 import Lens.Micro
 import Panepon.Board
 import qualified Panepon.Cursor as C
+import Panepon.Env
+import Panepon.Game
 import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
-import Panepon.Game
 import Panepon.Render (Render, render)
 import System.TimeIt (timeItT)
 import Text.Printf
 import Prelude hiding (Left, Right)
-import Panepon.Env
 
 data Tick = Tick
 
@@ -83,7 +84,7 @@ drawUI g =
 
 drawStats :: Game -> Widget Name
 drawStats g =
-  hLimit 24 $
+  hLimit 25 $
     vBox
       [ drawDebugInfo (g ^. board) (g ^. debug),
         padTop (Pad 2) $ drawGameOver (g ^. board . dead)
@@ -97,7 +98,8 @@ drawDebugInfo board debug =
         vBox
           [ drawStrShow "combo" $ board ^. combo,
             drawStrShow "chain" $ board ^. chain,
-            drawStrShow "lift" $ board ^. grid . G.lift,
+            drawStrShow "score" $ board ^. score,
+            drawStr "lift" $ printf "%2d%%" $ board ^. grid . G.lift . to (\r -> 100 * numerator r `div` denominator r),
             drawStrShow "forceMode" $ board ^. grid . G.forceMode,
             drawStrShow "liftEvent" $ board ^. grid . G.prevEvent,
             drawStr "duration" $ printf "%.4fms" $ debug ^. duration . to (* 1000)

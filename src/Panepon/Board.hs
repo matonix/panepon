@@ -24,7 +24,6 @@ class ColorGenerator g where
   mkGen :: [P.Color] -> g
 
 -- deterministic
--- #TODO 記述順が影響するのを回避する（mkLensesの前にすべて宣言済みとなる必要がある）
 newtype DetGen = DetGen [P.Color]
 
 instance ColorGenerator DetGen where
@@ -42,6 +41,7 @@ data Board = Board
     _gen :: DetGen,
     _combo :: Int,
     _chain :: Int,
+    _score :: Int,
     _dead :: Bool
   }
   deriving (Show)
@@ -60,12 +60,19 @@ data Event
 type Events = [Event]
 
 next :: Events -> Board -> Board
-next events (Board rule panels grid cursor gen combo chain False) =
+next events (Board rule panels grid cursor gen combo chain score False) =
   let grid' = nextGrid rule events panels grid
       cursor' = nextCursor events grid' cursor
-      (panels', gen', combo', chain', dead') = nextPanels rule events grid' cursor' panels gen combo chain
-   in Board rule panels' grid' cursor' gen' combo' chain' dead'
+      (panels', gen', combo', chain', chain_up, dead') = nextPanels rule events grid' cursor' panels gen combo chain
+      score' = nextScore rule score combo' chain' chain_up
+   in Board rule panels' grid' cursor' gen' combo' chain' score' dead'
 next events board@(_dead -> True) = board
+
+nextScore :: Rule -> Int -> Int -> Int -> Bool -> Int
+nextScore rule score combo chain chain_up = score + chainScore + comboScore
+  where
+    chainScore = if chain_up then lookupScoreTable (rule ^. chainTable) chain else 0
+    comboScore = if combo > 0 then lookupScoreTable (rule ^. comboTable) combo else 0
 
 nextGrid :: Rule -> Events -> Panels -> G.Grid -> G.Grid
 nextGrid rule events panels grid
@@ -117,8 +124,8 @@ genPanels gen panels poss = go poss gen panels
 genGround :: ColorGenerator g => g -> Panels -> G.Grid -> (Panels, g)
 genGround gen panels grid = genPanels gen panels [(i, - G._depth grid) | i <- [1 .. G._width grid]]
 
-nextPanels :: ColorGenerator g => Rule -> Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int, Bool)
-nextPanels rule events grid cursor panels gen combo chain = (ss, gen', combo', chain', dead)
+nextPanels :: ColorGenerator g => Rule -> Events -> G.Grid -> C.Cursor -> Panels -> g -> Int -> Int -> (Panels, g, Int, Int, Bool, Bool)
+nextPanels rule events grid cursor panels gen combo chain = (ss, gen', combo', chain', chain_up, dead)
   where
     -- tick event
     te = tickEvent panels
@@ -135,7 +142,7 @@ nextPanels rule events grid cursor panels gen combo chain = (ss, gen', combo', c
     -- combo
     combo' = comboCount cs
     -- chain
-    chain' = chainCount cs chain
+    (chain', chain_up) = chainCount cs chain
     -- swap start
     ss = swapStart cs events cursor
     -- check dead
@@ -199,12 +206,12 @@ comboStart panels = flip map panels $ \p@(P._pos -> pos) -> if elem pos comboabl
 comboCount :: Panels -> Int
 comboCount = length . filter (\p -> P._state p == P.Vanish && P._count p == 0)
 
-chainCount :: Panels -> Int -> Int
+chainCount :: Panels -> Int -> (Int, Bool)
 chainCount panels chain
-  | chainInc = chain + 1
-  | chainContinue = chain
-  | anyVanishing = 1
-  | otherwise = 0
+  | chainInc = (chain + 1, True)
+  | chainContinue = (chain, False)
+  | anyVanishing = (1, False)
+  | otherwise = (0, False)
   where
     chainInc = any (\p -> P._state p == P.Vanish && P._count p == 0 && P._chainable p) panels
     chainContinue = not . all (\p -> P._state p == P.Init || (P._state p == P.Idle && P._count p > 0)) $ filter P._chainable panels
