@@ -2,7 +2,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -21,29 +20,16 @@ import Data.List
 import Data.Maybe (fromMaybe)
 import qualified Graphics.Vty as V
 import Lens.Micro
-import Lens.Micro.TH
 import Panepon.Board
 import qualified Panepon.Cursor as C
 import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
+import Panepon.Game
 import Panepon.Render (Render, render)
 import System.TimeIt (timeItT)
 import Text.Printf
 import Prelude hiding (Left, Right)
-
-newtype Debug = Debug
-  { _duration :: Double
-  }
-
-makeLenses ''Debug
-
-data Game = Game
-  { _events :: Events,
-    _board :: Board,
-    _debug :: Debug
-  }
-
-makeLenses ''Game
+import Panepon.Env
 
 data Tick = Tick
 
@@ -51,17 +37,16 @@ type Name = ()
 
 -- App definition
 
-debugMain :: Board -> IO ()
-debugMain b = do
+tuiMain :: Env -> IO ()
+tuiMain env = do
   chan <- newBChan 10
   forkIO $
     forever $ do
       writeBChan chan Tick
-      threadDelay 500000 -- #TODO make config for setting FPS
-  g <- initGame b
+      threadDelay $ 1000000 `div` env ^. fps
   let builder = V.mkVty V.defaultConfig
   initialVty <- builder
-  void $ customMain initialVty builder (Just chan) app g
+  void $ customMain initialVty builder (Just chan) app $ env ^. game
 
 app :: App Game Tick Name
 app =
@@ -90,19 +75,6 @@ handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc [])) = halt g
 handleEvent g _ = continue g
 
--- #TODO implement "Env" layer steps
-
-step :: Game -> IO Game
-step game = return $ game & board %~ next es & events .~ []
-  where
-    es = game ^. events
-
-turn :: Event -> Game -> Game
-turn event game = game & events %~ (event :)
-
-initGame :: Board -> IO Game
-initGame board = return $ Game [] board (Debug 0)
-
 -- Drawing
 
 drawUI :: Game -> [Widget Name]
@@ -111,7 +83,7 @@ drawUI g =
 
 drawStats :: Game -> Widget Name
 drawStats g =
-  hLimit 22 $
+  hLimit 24 $
     vBox
       [ drawDebugInfo (g ^. board) (g ^. debug),
         padTop (Pad 2) $ drawGameOver (g ^. board . dead)

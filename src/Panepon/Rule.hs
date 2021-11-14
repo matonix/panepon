@@ -29,3 +29,15 @@ debugRule =
       _forceLiftFinish = 3,
       _availableColors = [Red, Green, Cyan, Purple, Yellow, Blue]
     }
+
+ordinaryRule :: Rule
+ordinaryRule =
+  Rule
+    { _moveFinish = 10,
+      _floatFinish = 60,
+      _fallFinish = 1,
+      _vanishFinish = 300,
+      _liftFinish = 300,
+      _forceLiftFinish = 60,
+      _availableColors = [Red, Green, Cyan, Purple, Yellow, Blue]
+    }

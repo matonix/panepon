@@ -5,11 +5,17 @@ import Panepon.Read
 import Panepon.Render
 import qualified Panepon.TUI as TUI
 import Prelude hiding (Left, Right)
+import Panepon.Game
+import Panepon.Env
+import Lens.Micro
+import Panepon.Rule
 
 main :: IO ()
 main = do
-  let board = toBoard sample
-  TUI.debugMain board
+  let board = toBoard sample & rule .~ ordinaryRule 
+  game <- initGame board
+  let env = Env game ordinaryFPS
+  TUI.tuiMain env
 
 -- main = do
 --   let board = toBoard sample
