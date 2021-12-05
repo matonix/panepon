@@ -1,6 +1,6 @@
-<mxfile>
+<mxfile host="65bd71144e">
     <diagram id="hn-lwac6SuAFHTdOzXIv" name="Page-1">
-        <mxGraphModel dx="926" dy="599" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1003" dy="551" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -92,18 +92,6 @@
                         <mxPoint x="4" as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="40" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=none;endFill=0;align=left;verticalAlign=middle;" parent="1" source="38" target="4" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=none;endFill=0;align=left;verticalAlign=middle;" parent="1" source="38" target="2" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=none;endFill=0;align=left;verticalAlign=middle;" parent="1" source="38" target="3" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
-                </mxCell>
-                <mxCell id="38" value="«interface»&lt;br&gt;&lt;b&gt;Render&lt;/b&gt;" style="html=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="350" y="910" width="110" height="50" as="geometry"/>
-                </mxCell>
                 <mxCell id="43" value="menu" style="html=1;" parent="1" vertex="1">
                     <mxGeometry x="550" y="560" width="110" height="50" as="geometry"/>
                 </mxCell>
@@ -133,12 +121,6 @@
                     <mxGeometry x="0.7172" y="2" relative="1" as="geometry">
                         <mxPoint x="4" y="24" as="offset"/>
                     </mxGeometry>
-                </mxCell>
-                <mxCell id="51" value="renderer" style="html=1;" vertex="1" parent="1">
-                    <mxGeometry x="200" y="440" width="110" height="50" as="geometry"/>
-                </mxCell>
-                <mxCell id="52" value="tick" style="html=1;" vertex="1" parent="1">
-                    <mxGeometry x="50" y="440" width="110" height="50" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

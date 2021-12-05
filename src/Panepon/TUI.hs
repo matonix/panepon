@@ -18,10 +18,11 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Foldable
 import Data.List
 import Data.Maybe (fromMaybe)
-import Data.Ratio (numerator, denominator)
+import Data.Ratio (denominator, numerator)
 import qualified Graphics.Vty as V
 import Lens.Micro
-import Panepon.Board
+import Panepon.Board (Board, Event (..))
+import qualified Panepon.Board as B
 import qualified Panepon.Cursor as C
 import Panepon.Env
 import Panepon.Game
@@ -65,12 +66,12 @@ handleEvent :: Game -> BrickEvent Name Tick -> EventM Name (Next Game)
 handleEvent g (AppEvent Tick) = do
   (d, g') <- liftIO $ timeItT (step g)
   continue $ g' & debug . duration .~ d
-handleEvent g (VtyEvent (V.EvKey V.KUp [])) = continue $ turn Up g
-handleEvent g (VtyEvent (V.EvKey V.KDown [])) = continue $ turn Down g
-handleEvent g (VtyEvent (V.EvKey V.KRight [])) = continue $ turn Right g
-handleEvent g (VtyEvent (V.EvKey V.KLeft [])) = continue $ turn Left g
-handleEvent g (VtyEvent (V.EvKey (V.KChar 'x') [])) = continue $ turn Swap g
-handleEvent g (VtyEvent (V.EvKey (V.KChar 'z') [])) = continue $ turn Lift g
+handleEvent g (VtyEvent (V.EvKey V.KUp [])) = continue $ next Up g
+handleEvent g (VtyEvent (V.EvKey V.KDown [])) = continue $ next Down g
+handleEvent g (VtyEvent (V.EvKey V.KRight [])) = continue $ next Right g
+handleEvent g (VtyEvent (V.EvKey V.KLeft [])) = continue $ next Left g
+handleEvent g (VtyEvent (V.EvKey (V.KChar 'x') [])) = continue $ next Swap g
+handleEvent g (VtyEvent (V.EvKey (V.KChar 'z') [])) = continue $ next Lift g
 -- handleEvent g (VtyEvent (V.EvKey (V.KChar 'r') [])) = liftIO initGame >>= continue
 handleEvent g (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt g
 handleEvent g (VtyEvent (V.EvKey V.KEsc [])) = halt g
@@ -87,7 +88,7 @@ drawStats g =
   hLimit 25 $
     vBox
       [ drawDebugInfo (g ^. board) (g ^. debug),
-        padTop (Pad 2) $ drawGameOver (g ^. board . dead)
+        padTop (Pad 1) $ drawGameOver (g ^. board . B.dead)
       ]
 
 drawDebugInfo :: Board -> Debug -> Widget Name
@@ -96,12 +97,12 @@ drawDebugInfo board debug =
     B.borderWithLabel (str "Info") $
       C.hCenter $
         vBox
-          [ drawStrShow "combo" $ board ^. combo,
-            drawStrShow "chain" $ board ^. chain,
-            drawStrShow "score" $ board ^. score,
-            drawStr "lift" $ printf "%2d%%" $ board ^. grid . G.lift . to (\r -> 100 * numerator r `div` denominator r),
-            drawStrShow "forceMode" $ board ^. grid . G.forceMode,
-            drawStrShow "liftEvent" $ board ^. grid . G.prevEvent,
+          [ drawStrShow "combo" $ board ^. B.combo,
+            drawStrShow "chain" $ board ^. B.chain,
+            drawStrShow "score" $ board ^. B.score,
+            drawStr "lift" $ printf "%2d%%" $ board ^. B.grid . G.lift . to (\r -> 100 * numerator r `div` denominator r),
+            drawStrShow "forceMode" $ board ^. B.grid . G.forceMode,
+            drawStrShow "liftEvent" $ board ^. B.grid . G.prevEvent,
             drawStr "duration" $ printf "%.4fms" $ debug ^. duration . to (* 1000)
           ]
   where
@@ -128,9 +129,9 @@ instance Render Board (Widget Name) where
           B.borderWithLabel (str "Panepon") $
             vBox rows
     where
-      C.Cursor cx cy = board ^. cursor
-      (w, h) = board ^. grid . to G.getBound
-      ps = board ^. panels
+      C.Cursor cx cy = board ^. B.cursor
+      (w, h) = board ^. B.grid . to G.getBound
+      ps = board ^. B.panels
       rows = reverse [hBox $ cellsInRow j | j <- [0 .. h]]
       cellsInRow j = renderCursor cx cy 0 j : concat [renderPanel i j | i <- [1 .. w]]
       renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor cx cy i j]
