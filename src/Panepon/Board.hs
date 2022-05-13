@@ -16,6 +16,7 @@ import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
 import Panepon.Rule
 import Prelude hiding (Left, Right)
+import qualified Data.List.NonEmpty as N
 
 type Panels = [P.Panel]
 
@@ -24,11 +25,11 @@ class ColorGenerator g where
   mkGen :: [P.Color] -> g
 
 -- deterministic
-newtype DetGen = DetGen [P.Color]
+newtype DetGen = DetGen (N.NonEmpty P.Color)
 
 instance ColorGenerator DetGen where
-  getNext (DetGen (c : cs)) = (c, DetGen cs)
-  mkGen availableColors = DetGen $ cycle $ concat $ permutations availableColors
+  getNext (DetGen (c N.:| cs)) = (c, DetGen (N.fromList cs))
+  mkGen availableColors = DetGen $ N.cycle $ N.fromList $ concat $ permutations availableColors
 
 instance Show DetGen where
   show = const "DetGen"
@@ -66,7 +67,7 @@ next events (Board rule panels grid cursor gen combo chain score False) =
       (panels', gen', combo', chain', chain_up, dead') = nextPanels rule events grid' cursor' panels gen combo chain
       score' = nextScore rule score combo' chain' chain_up
    in Board rule panels' grid' cursor' gen' combo' chain' score' dead'
-next events board@(_dead -> True) = board
+next events board@(Board _ _ _ _ _ _ _ _ True) = board
 
 nextScore :: Rule -> Int -> Int -> Int -> Bool -> Int
 nextScore rule score combo chain chain_up = score + chainScore + comboScore
