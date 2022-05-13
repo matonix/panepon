@@ -1,11 +1,23 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Panepon.Game where
 
 import Lens.Micro
 import Lens.Micro.TH
-import Panepon.Board (Board, Event, Events)
 import qualified Panepon.Board as B
+import Prelude hiding (Left, Right)
+
+data Event
+  = Up
+  | Down
+  | Left
+  | Right
+  | Confirm
+  | Cancel
+  deriving (Eq)
+
+type Events = [Event]
 
 newtype Debug = Debug
   { _duration :: Double
@@ -14,20 +26,24 @@ newtype Debug = Debug
 makeLenses ''Debug
 
 data Game = Game
-  { _events :: Events,
-    _board :: Board,
+  { _board :: B.Board,
     _debug :: Debug
   }
 
 makeLenses ''Game
 
-step :: Game -> IO Game
-step game = return $ game & board %~ B.next es & events .~ []
+next :: Events -> Game -> Game
+next events game = Game {..}
   where
-    es = game ^. events
+    _board = B.next events' $ game ^. board
+      where
+        events' = map eventMapper events
+    _debug = _debug
 
-next :: Event -> Game -> Game
-next event game = game & events %~ (event :)
-
-initGame :: Board -> IO Game
-initGame board = return $ Game [] board (Debug 0)
+eventMapper :: Event -> B.Event
+eventMapper Up = B.Up
+eventMapper Down = B.Down
+eventMapper Left = B.Left
+eventMapper Right = B.Right
+eventMapper Confirm = B.Swap
+eventMapper Cancel = B.Lift

@@ -1,11 +1,11 @@
 module Main where
 
-import Panepon.Board
+import Panepon.Board ( rule )
 import Panepon.Read
 import Panepon.Render
 import qualified Panepon.TUI as TUI
 import Prelude hiding (Left, Right)
-import Panepon.Game
+-- import Panepon.Game
 import Panepon.Env
 import Lens.Micro
 import Panepon.Rule
@@ -13,8 +13,7 @@ import Panepon.Rule
 main :: IO ()
 main = do
   let board = toBoard sample & rule .~ ordinaryRule 
-  game <- initGame board
-  let env = Env game ordinaryFPS
+  env <- initEnv board ordinaryFPS
   TUI.tuiMain env
 
 -- main = do
@@ -54,8 +53,8 @@ sample2 =
     "......"
   ]
 
-events :: [Events]
-events = [[Down], [Down, Left], [Left], [Swap], [Right], [Right, Down], [Right, Up], [Right], [Right]] ++ repeat []
+events :: [KeyEvents]
+events = [[Down], [Down, Left], [Left], [Confirm], [Right], [Right, Down], [Right, Up], [Right], [Right]] ++ repeat []
 
-events2 :: [Events]
-events2 = [Lift] : repeat []
+events2 :: [KeyEvents]
+events2 = [Cancel] : repeat []
