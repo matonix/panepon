@@ -21,6 +21,8 @@ extra-source-files: CHANGELOG.md
 
 common shared-properties
   default-language: Haskell2010
+  ghc-options: -Wcompat
+  -- ghc-options: -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-import-lists -Wcompat
   build-depends:
     , base          ^>=4.14.1.0
     , brick
@@ -48,6 +50,7 @@ library
     Panepon.Read
     Panepon.Render
     Panepon.Rule
-    Panepon.TUI
+    Panepon.TUI.Main
+    Panepon.TUI.Render
 
   hs-source-dirs:  src

@@ -2,8 +2,7 @@ module Main where
 
 import Panepon.Board ( rule )
 import Panepon.Read
-import Panepon.Render
-import qualified Panepon.TUI as TUI
+import qualified Panepon.TUI.Main as TUI
 import Prelude hiding (Left, Right)
 -- import Panepon.Game
 import Panepon.Env

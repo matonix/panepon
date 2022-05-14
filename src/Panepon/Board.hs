@@ -7,7 +7,8 @@
 module Panepon.Board where
 
 import Data.Foldable
-import Data.List
+import qualified Data.List as L
+import qualified Data.List.NonEmpty as N
 import Data.Maybe
 import Lens.Micro
 import Lens.Micro.TH
@@ -16,7 +17,8 @@ import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
 import Panepon.Rule
 import Prelude hiding (Left, Right)
-import qualified Data.List.NonEmpty as N
+
+type Name = ()
 
 type Panels = [P.Panel]
 
@@ -29,7 +31,7 @@ newtype DetGen = DetGen (N.NonEmpty P.Color)
 
 instance ColorGenerator DetGen where
   getNext (DetGen (c N.:| cs)) = (c, DetGen (N.fromList cs))
-  mkGen availableColors = DetGen $ N.cycle $ N.fromList $ concat $ permutations availableColors
+  mkGen availableColors = DetGen $ N.cycle $ N.fromList $ concat $ L.permutations availableColors
 
 instance Show DetGen where
   show = const "DetGen"
@@ -88,10 +90,10 @@ nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor eve
     (w, h) = G.getBound grid
     events' = if G._liftComplete grid then events ++ [Up] else events
     toCursorEvent :: C.Cursor -> Event -> C.Event
-    toCursorEvent (C.Cursor x y) Up | y < h = C.Up
-    toCursorEvent (C.Cursor x y) Down | y > 1 = C.Down
-    toCursorEvent (C.Cursor x y) Left | x > 1 = C.Left
-    toCursorEvent (C.Cursor x y) Right | x + 1 < w = C.Right
+    toCursorEvent (C.Cursor _x y) Up | y < h = C.Up
+    toCursorEvent (C.Cursor _x y) Down | y > 1 = C.Down
+    toCursorEvent (C.Cursor x _y) Left | x > 1 = C.Left
+    toCursorEvent (C.Cursor x _y) Right | x + 1 < w = C.Right
     toCursorEvent _ _ = C.None
 
 genPanel :: ColorGenerator g => g -> Panels -> P.Pos -> (P.Panel, g)

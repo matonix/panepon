@@ -62,7 +62,7 @@ next (CountFinish Fall c) panel@(_state -> Fall) | _count panel == c = panel & s
 next (CountFinish Vanish c) panel@(_state -> Vanish) | _count panel == c = panel & state .~ Empty & countReset
 next (Bottom Empty _ ch) panel@(_state -> Idle) = panel & state .~ Float & countReset & chainable .~ ch
 next (Bottom Fall _ ch) panel@(_state -> Idle) = panel & state .~ Fall & countReset & chainable .~ ch
-next (Bottom Float c _) panel@(_state -> Fall) = panel & state .~ Float & countReset
+next (Bottom Float _ _) panel@(_state -> Fall) = panel & state .~ Float & countReset
 next (Bottom b _ _) panel@(_state -> Fall) | isGround b = panel & state .~ Idle & countReset
 next (Bottom b _ _) panel@(_state -> Idle) | isGround b && _count panel > 0 = panel & state .~ Idle & chainable .~ False
 next Available panel@(_state -> Init) = panel & state .~ Idle

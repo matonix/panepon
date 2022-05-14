@@ -4,25 +4,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
-module Panepon.TUI where
--- TODO: Render(ViewModel) と アプリケーションの制御（Event）を分類すべき
+module Panepon.TUI.Render where
 
-import Brick hiding (Down, Left, Right, Up, render)
-import Brick.BChan (newBChan, writeBChan)
+import Brick hiding (Down, Up, render)
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
-import Control.Concurrent (forkIO, threadDelay)
-import Control.Monad (forever, void)
-import Control.Monad.IO.Class (liftIO)
 import Data.Foldable
-import Data.List
-import Data.Maybe (fromMaybe)
 import Data.Ratio (denominator, numerator)
 import qualified Graphics.Vty as V
 import Lens.Micro
-import Panepon.Board (Board, Event (..))
+import Panepon.Board (Board)
 import qualified Panepon.Board as B
 import qualified Panepon.Cursor as C
 import qualified Panepon.Env as Env
@@ -30,55 +24,10 @@ import qualified Panepon.Game as Game
 import qualified Panepon.Grid as G
 import qualified Panepon.Panel as P
 import Panepon.Render (Render, render)
-import System.TimeIt (timeItT)
 import Text.Printf
 import Prelude hiding (Left, Right)
 
-data Tick = Tick
-
 type Name = ()
-
--- App definition
-
-tuiMain :: Env.Env -> IO ()
-tuiMain env = do
-  chan <- newBChan 10
-  forkIO $
-    forever $ do
-      writeBChan chan Tick
-      threadDelay $ 1000000 `div` env ^. Env.fps
-  let builder = V.mkVty V.defaultConfig
-  initialVty <- builder
-  void $ customMain initialVty builder (Just chan) app env
-
-app :: App Env.Env Tick Name
-app =
-  App
-    { appDraw = drawUI,
-      appChooseCursor = neverShowCursor,
-      appHandleEvent = handleEvent,
-      appStartEvent = return,
-      appAttrMap = const theMap
-    }
-
--- Handling events
-
-handleEvent :: Env.Env -> BrickEvent Name Tick -> EventM Name (Next Env.Env)
-handleEvent e (AppEvent Tick) = do
-  (d, e') <- liftIO $ timeItT (return $ Env.next Env.Tick e)
-  continue $ e' & Env.game . Game.debug . Game.duration .~ d
-handleEvent e (VtyEvent (V.EvKey V.KUp [])) = continue $ Env.next (Env.Key Env.Up) e
-handleEvent e (VtyEvent (V.EvKey V.KDown [])) = continue $ Env.next (Env.Key Env.Down) e
-handleEvent e (VtyEvent (V.EvKey V.KRight [])) = continue $ Env.next (Env.Key Env.Right) e
-handleEvent e (VtyEvent (V.EvKey V.KLeft [])) = continue $ Env.next (Env.Key Env.Left) e
-handleEvent e (VtyEvent (V.EvKey (V.KChar 'x') [])) = continue $ Env.next (Env.Key Env.Confirm) e
-handleEvent e (VtyEvent (V.EvKey (V.KChar 'z') [])) = continue $ Env.next (Env.Key Env.Cancel) e
--- handleEvent e (VtyEvent (V.EvKey (V.KChar 'r') [])) = liftIO initGame >>= continue
-handleEvent e (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt e -- 終了を正しく扱うのはTODO
-handleEvent e (VtyEvent (V.EvKey V.KEsc [])) = halt e
-handleEvent e _ = continue e
-
--- Drawing
 
 drawUI :: Env.Env -> [Widget Name]
 drawUI env = [render env]
