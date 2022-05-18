@@ -47,7 +47,7 @@ ordinaryRule :: Rule
 ordinaryRule =
   Rule
     { _moveFinish = 10,
-      _floatFinish = 60,
+      _floatFinish = 30,
       _fallFinish = 1,
       _vanishBlink = 30,
       _vanishWait = 30,

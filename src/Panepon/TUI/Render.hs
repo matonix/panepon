@@ -87,10 +87,9 @@ instance Render Board (Widget Name) where
       ps = board ^. B.panels
       rows = reverse [hBox $ cellsInRow j | j <- [0 .. h]]
       cellsInRow j = renderCursor cx cy 0 j : concat [renderPanel i j | i <- [1 .. w]]
-      renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybeColor $ renderCursor cx cy i j]
+      renderPanel i j = [maybe renderEmpty render maybePanel, maybe id colorAttr maybePanel $ renderCursor cx cy i j]
         where
           maybePanel = find ((== (i, j)) . P._pos) ps
-          maybeColor = fmap P._color maybePanel
 
 renderEmpty :: Widget Name
 renderEmpty = str " "
@@ -102,17 +101,19 @@ renderCursor x y i j
   | otherwise = str " "
 
 instance Render P.Panel (Widget Name) where
-  render p = colorAttr (P._color p) $ renderDebug p
+  render p = renderDebug p & colorAttr p
 
-colorAttr :: P.Color -> Widget Name -> Widget Name
-colorAttr P.Red = withAttr redAttr
-colorAttr P.Green = withAttr greenAttr
-colorAttr P.Cyan = withAttr cyanAttr
-colorAttr P.Purple = withAttr purpleAttr
-colorAttr P.Yellow = withAttr yellowAttr
-colorAttr P.Blue = withAttr blueAttr
+colorAttr :: P.Panel -> Widget Name -> Widget Name
+colorAttr (P._state -> P.Vanish P.Vanished) = withAttr emptyAttr
+colorAttr (P._state -> P.Vanish P.Wait) = withAttr vanishAttr
+colorAttr (P._color -> P.Red) = withAttr redAttr
+colorAttr (P._color -> P.Green) = withAttr greenAttr
+colorAttr (P._color -> P.Cyan) = withAttr cyanAttr
+colorAttr (P._color -> P.Purple) = withAttr purpleAttr
+colorAttr (P._color -> P.Yellow) = withAttr yellowAttr
+colorAttr (P._color -> P.Blue) = withAttr blueAttr
 
-redAttr, greenAttr, cyanAttr, purpleAttr, yellowAttr, blueAttr, cursorAttr :: AttrName
+redAttr, greenAttr, cyanAttr, purpleAttr, yellowAttr, blueAttr, cursorAttr, vanishAttr, emptyAttr :: AttrName
 redAttr = "redAttr"
 greenAttr = "greenAttr"
 cyanAttr = "cyanAttr"
@@ -120,6 +121,8 @@ purpleAttr = "purpleAttr"
 yellowAttr = "yellowAttr"
 blueAttr = "blueAttr"
 cursorAttr = "cursorAttr"
+vanishAttr = "vanishAttr"
+emptyAttr = "emptyAttr"
 
 renderDebug :: P.Panel -> Widget Name
 renderDebug (P._state -> P.Init) = str "X"
@@ -136,7 +139,7 @@ renderDebug (P._color -> P.Cyan) = str "▲"
 renderDebug (P._color -> P.Purple) = str "◆"
 renderDebug (P._color -> P.Yellow) = str "★"
 renderDebug (P._color -> P.Blue) = str "▼"
-
+  
 theMap :: AttrMap
 theMap =
   attrMap
@@ -147,5 +150,7 @@ theMap =
       (purpleAttr, V.black `on` V.magenta),
       (yellowAttr, V.black `on` V.yellow),
       (blueAttr, V.black `on` V.blue),
-      (cursorAttr, V.currentAttr `V.withStyle` V.bold `V.withForeColor` V.white)
+      (cursorAttr, V.currentAttr `V.withStyle` V.bold `V.withForeColor` V.white),
+      (vanishAttr, V.black `on` V.brightBlack),
+      (emptyAttr, fg V.white)
     ]
