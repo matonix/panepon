@@ -9,7 +9,10 @@ import Lens.Micro ( Lens', (&), (%~), (.~), _1, _2 )
 data Color = Red | Green | Cyan | Purple | Yellow | Blue
   deriving (Eq, Show)
 
-data State = Init | Idle | Move Direction | Float | Fall | Vanish | Empty
+data VState = Blink | Wait | Vanished
+  deriving (Eq, Show)
+
+data State = Init | Idle | Move Direction | Float | Fall | Vanish VState | Empty
   deriving (Eq, Show)
 
 data Direction = L | R
@@ -24,7 +27,9 @@ data Panel = Panel
     _state :: State,
     _count :: Count,
     _pos :: Pos,
-    _chainable :: Bool
+    _chainable :: Bool,
+    _vanishIx :: Maybe Int,
+    _vanishTotal :: Maybe Int
   }
   deriving (Eq, Show)
 
@@ -43,8 +48,8 @@ data Event
 isGround :: State -> Bool
 isGround Init = True
 isGround Idle = True
-isGround (Move _) = True
-isGround Vanish = True
+isGround Move{} = True
+isGround Vanish{} = True
 isGround _ = False
 
 isMovable :: State -> Bool
@@ -59,14 +64,16 @@ next Lift panel = panel & posY %~ succ
 next (CountFinish (Move d) c) panel@(_state -> Move d') | _count panel == c && d == d' = panel & state .~ Idle & countReset
 next (CountFinish Float c) panel@(_state -> Float) | _count panel == c = panel & state .~ Fall & countReset
 next (CountFinish Fall c) panel@(_state -> Fall) | _count panel == c = panel & state .~ Fall & countReset & posY %~ pred
-next (CountFinish Vanish c) panel@(_state -> Vanish) | _count panel == c = panel & state .~ Empty & countReset
+next (CountFinish (Vanish Blink) c) panel@(_state -> Vanish Blink) | _count panel == c = panel & state .~ Vanish Wait & countReset
+next (CountFinish (Vanish Wait) c) panel@(_state -> Vanish Wait) | _count panel == c = panel & state .~ Vanish Vanished & countReset
+next (CountFinish (Vanish Vanished) c) panel@(_state -> Vanish Vanished) | _count panel == c = panel & state .~ Empty & countReset
 next (Bottom Empty _ ch) panel@(_state -> Idle) = panel & state .~ Float & countReset & chainable .~ ch
 next (Bottom Fall _ ch) panel@(_state -> Idle) = panel & state .~ Fall & countReset & chainable .~ ch
 next (Bottom Float _ _) panel@(_state -> Fall) = panel & state .~ Float & countReset
 next (Bottom b _ _) panel@(_state -> Fall) | isGround b = panel & state .~ Idle & countReset
 next (Bottom b _ _) panel@(_state -> Idle) | isGround b && _count panel > 0 = panel & state .~ Idle & chainable .~ False
 next Available panel@(_state -> Init) = panel & state .~ Idle
-next Combo panel@(_state -> Idle) = panel & state .~ Vanish & countReset
+next Combo panel@(_state -> Idle) = panel & state .~ Vanish Blink & countReset
 next (Swap L) panel@(_state -> s) | isMovable s = panel & state .~ Move L & countReset & posX %~ pred
 next (Swap R) panel@(_state -> s) | isMovable s = panel & state .~ Move R & countReset & posX %~ succ
 next _ panel = panel

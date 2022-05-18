@@ -97,7 +97,7 @@ nextCursor events grid cursor = foldr (C.next . toCursorEvent cursor) cursor eve
     toCursorEvent _ _ = C.None
 
 genPanel :: ColorGenerator g => g -> Panels -> P.Pos -> (P.Panel, g)
-genPanel gen panels pos@(i, j) = (P.Panel c P.Init 0 pos False, gen')
+genPanel gen panels pos@(i, j) = (P.Panel c P.Init 0 pos False Nothing Nothing, gen')
   where
     (c, gen') = go gen ngs
       where
@@ -143,11 +143,11 @@ nextPanels rule events grid cursor panels gen combo chain = (ss, gen', combo', c
     -- combo start
     cs = comboStart ec
     -- combo
-    combo' = comboCount cs
+    (combo', cc) = comboCount cs
     -- chain
-    (chain', chain_up) = chainCount cs chain
+    (chain', chain_up) = chainCount cc chain
     -- swap start
-    ss = swapStart cs events cursor
+    ss = swapStart cc events cursor
     -- check dead
     dead = checkDead grid ss
 
@@ -163,6 +163,7 @@ liftEvent panels gen grid =
        in genGround gen available grid
     else (panels, gen)
 
+-- #TODO: next をチェーンする方法がイケてない気がする
 countFinish :: Rule -> Panels -> Panels
 countFinish rule panels =
   flip map panels $
@@ -170,7 +171,11 @@ countFinish rule panels =
       . P.next (P.CountFinish (P.Move P.R) $ rule ^. moveFinish)
       . P.next (P.CountFinish P.Float $ rule ^. floatFinish)
       . P.next (P.CountFinish P.Fall $ rule ^. fallFinish)
-      . P.next (P.CountFinish P.Vanish $ rule ^. vanishFinish)
+-- Vanish state: Blink -(vanishBlink)-> Wait -(vanishWait + vanishPanel * ix)-> Vanished -(vanishPanel * (total - ix))-> Empty
+      . P.next (P.CountFinish (P.Vanish P.Blink) $ rule ^. vanishBlink)
+      . (\panel -> P.next (P.CountFinish (P.Vanish P.Wait) $ rule ^. vanishWait + rule ^. vanishPanel * fromJust (panel ^. P.vanishIx)) panel)
+      . (\panel -> P.next (P.CountFinish (P.Vanish P.Vanished) $ rule ^. vanishPanel * (fromJust (panel ^. P.vanishTotal) - fromJust (panel ^. P.vanishIx))) panel)
+-- #TODO fromJust で落ちてる（生成過程を実装せよ）
 
 bottomCondition :: Panels -> Panels
 bottomCondition panels = loop panels []
@@ -206,8 +211,14 @@ comboStart panels = flip map panels $ \p@(P._pos -> pos) -> if elem pos comboabl
                   map P._pos [p, a, b]
               _ -> []
 
-comboCount :: Panels -> Int
-comboCount = length . filter (\p -> P._state p == P.Vanish && P._count p == 0)
+comboCount :: Panels -> (Int, Panels)
+comboCount panels = (len, nextPanels)
+  where
+    (comboPanels, nonConboPanels) = L.partition (\p -> P._state p == P.Vanish P.Blink && P._count p == 0) panels
+    len = length comboPanels
+    sorted = L.sortBy (\(P._pos -> (x1, y1)) (P._pos -> (x2, y2)) -> compare y2 y1 <> compare x1 x2) comboPanels
+    comboPanels' = zipWith3 (\ix total p -> p & P.vanishIx ?~ ix & P.vanishTotal ?~ total) [0..] (repeat len) sorted
+    nextPanels = nonConboPanels ++ comboPanels'
 
 chainCount :: Panels -> Int -> (Int, Bool)
 chainCount panels chain
@@ -216,9 +227,11 @@ chainCount panels chain
   | anyVanishing = (1, False)
   | otherwise = (0, False)
   where
-    chainInc = any (\p -> P._state p == P.Vanish && P._count p == 0 && P._chainable p) panels
+    chainInc = any (\p -> P._state p == P.Vanish P.Blink && P._count p == 0 && P._chainable p) panels
     chainContinue = not . all (\p -> P._state p == P.Init || (P._state p == P.Idle && P._count p > 0)) $ filter P._chainable panels
-    anyVanishing = any (\p -> P._state p == P.Vanish) panels
+    anyVanishing = any (\p -> case P._state p of
+      P.Vanish _ -> True
+      _ -> False ) panels
 
 swapStart :: Panels -> Events -> C.Cursor -> Panels
 swapStart panels events (C.Cursor x y) =
